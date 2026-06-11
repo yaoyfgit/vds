@@ -1,0 +1,399 @@
+import type { Activity, Vehicle, Driver, Task } from '../types';
+
+export const activities: Activity[] = [
+  {
+    id: 'act-1',
+    name: '智慧城市建设研讨会',
+    startTime: '2026-06-10',
+    endTime: '2026-06-15',
+    location: '广州市政务中心',
+    description: '智慧城市建设专题研讨会，邀请国内外专家参加',
+    status: '进行中',
+    vehicleIds: ['v-1', 'v-2', 'v-3'],
+    driverIds: ['d-1', 'd-2']
+  },
+  {
+    id: 'act-2',
+    name: '企业考察团接待',
+    startTime: '2026-06-18',
+    endTime: '2026-06-20',
+    location: '深圳会展中心',
+    description: '接待外地企业考察团',
+    status: '筹备中',
+    vehicleIds: ['v-1', 'v-4'],
+    driverIds: ['d-1', 'd-2']
+  },
+  {
+    id: 'act-3',
+    name: '年度总结会议',
+    startTime: '2026-01-10',
+    endTime: '2026-01-12',
+    location: '市政府大礼堂',
+    description: '年度工作总结会议',
+    status: '已结束',
+    vehicleIds: [],
+    driverIds: []
+  }
+];
+
+export const vehicles: Vehicle[] = [
+  {
+    id: 'v-1',
+    plateNumber: '粤A12345',
+    type: '商务车',
+    brand: '别克GL8',
+    capacity: 7,
+    color: '黑色',
+    licenseRequired: 'C1',
+    supplier: '安迅租车',
+    contactPhone: '13800138001',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    notes: '车况良好，定期保养',
+    status: '可调配'
+  },
+  {
+    id: 'v-2',
+    plateNumber: '粤A67890',
+    type: '轿车',
+    brand: '奥迪A6L',
+    capacity: 5,
+    color: '黑色',
+    licenseRequired: 'C1',
+    supplier: '安迅租车',
+    contactPhone: '13800138001',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    notes: '新车，舒适性好',
+    status: '执行中'
+  },
+  {
+    id: 'v-3',
+    plateNumber: '粤A54321',
+    type: 'SUV',
+    brand: '丰田汉兰达',
+    capacity: 7,
+    color: '白色',
+    licenseRequired: 'C1',
+    supplier: '恒通租车',
+    contactPhone: '13900139001',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    notes: '适合长途出行',
+    status: '可调配'
+  },
+  {
+    id: 'v-4',
+    plateNumber: '粤A09876',
+    type: '中巴',
+    brand: '江铃全顺',
+    capacity: 14,
+    color: '白色',
+    licenseRequired: 'B1',
+    supplier: '恒通租车',
+    contactPhone: '13900139001',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    notes: '适合团队出行',
+    status: '可调配'
+  },
+  {
+    id: 'v-5',
+    plateNumber: '粤A24680',
+    type: '大巴',
+    brand: '宇通客车',
+    capacity: 50,
+    color: '黄色',
+    licenseRequired: 'A1',
+    supplier: '远大客运',
+    contactPhone: '13600136001',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    notes: '大型客车，适合大型团队',
+    status: '不可用',
+    unavailableReason: '维修保养中'
+  }
+];
+
+export const drivers: Driver[] = [
+  {
+    id: 'd-1',
+    name: '李师傅',
+    phone: '13812345678',
+    idCardNumber: '440101198001011234',
+    licenseType: 'C1',
+    licenseExpiry: '2030-01-01',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    supplier: '安迅租车',
+    emergencyContact: '张女士',
+    emergencyPhone: '13987654321',
+    notes: '10年驾龄，熟悉广州市区路线',
+    status: '可调配'
+  },
+  {
+    id: 'd-2',
+    name: '王师傅',
+    phone: '13987654321',
+    idCardNumber: '440101197505055678',
+    licenseType: 'B1',
+    licenseExpiry: '2029-05-05',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    supplier: '安迅租车',
+    emergencyContact: '李先生',
+    emergencyPhone: '13812345678',
+    notes: '15年驾龄，可驾驶中巴车',
+    status: '执行中'
+  },
+  {
+    id: 'd-3',
+    name: '张师傅',
+    phone: '13611112222',
+    idCardNumber: '440101198510109012',
+    licenseType: 'A1',
+    licenseExpiry: '2028-10-10',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    supplier: '远大客运',
+    emergencyContact: '王女士',
+    emergencyPhone: '13733334444',
+    notes: '20年驾龄，专业大巴司机',
+    status: '不可用',
+    unavailableReason: '请假中',
+    expectedReturnDate: '2026-06-15'
+  },
+  {
+    id: 'd-4',
+    name: '陈师傅',
+    phone: '13733334444',
+    idCardNumber: '440101198803033456',
+    licenseType: 'C2',
+    licenseExpiry: '2032-03-03',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    supplier: '恒通租车',
+    emergencyContact: '陈太太',
+    emergencyPhone: '13855556666',
+    notes: '8年驾龄，自动挡专业司机',
+    status: '可调配'
+  }
+];
+
+export const tasks: Task[] = [
+  {
+    id: 't-1',
+    activityId: 'act-1',
+    name: '李局长接机',
+    type: '接机服务',
+    date: '2026-06-12',
+    startTime: '09:00',
+    endTime: '11:00',
+    from: '白云机场T2',
+    to: '东方酒店',
+    passenger: '李局长',
+    passengerPhone: '13811112222',
+    passengerCount: 1,
+    description: '从机场接李局长到酒店',
+    vehicleId: 'v-2',
+    driverId: 'd-2',
+    status: '执行中',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 86400000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 72000000).toISOString(), operator: '调度员', remark: '任务下发' },
+      { status: '已接收', time: new Date(Date.now() - 72000000).toISOString(), operator: '王师傅', remark: '接收任务' },
+      { status: '执行中', time: new Date(Date.now() - 3600000).toISOString(), operator: '系统', remark: '司机开始执行' }
+    ]
+  },
+  {
+    id: 't-2',
+    activityId: 'act-1',
+    name: '专家团会场接送',
+    type: '会议接送',
+    date: '2026-06-12',
+    startTime: '08:30',
+    endTime: '09:30',
+    from: '东方酒店',
+    to: '市政务中心',
+    passenger: '王教授等5人',
+    passengerPhone: '13633334444',
+    passengerCount: 5,
+    description: '接送专家团队到会场',
+    vehicleId: 'v-1',
+    driverId: 'd-1',
+    status: '待接收',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 18000000).toISOString(), operator: '调度员', remark: '任务下发' }
+    ]
+  },
+  {
+    id: 't-3',
+    activityId: 'act-1',
+    name: '黄市长视察',
+    type: '公务用车',
+    date: '2026-06-12',
+    startTime: '10:00',
+    endTime: '12:00',
+    from: '市政府',
+    to: '开发区管委会',
+    passenger: '黄市长',
+    passengerPhone: '13822223333',
+    passengerCount: 1,
+    description: '陪同市长考察开发区',
+    vehicleId: 'v-2',
+    driverId: 'd-2',
+    status: '已接收',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 21600000).toISOString(), operator: '调度员', remark: '任务下发' },
+      { status: '已接收', time: new Date(Date.now() - 18000000).toISOString(), operator: '王师傅', remark: '接收任务' }
+    ]
+  },
+  {
+    id: 't-9',
+    activityId: 'act-1',
+    name: '晚宴接送',
+    type: '商务接待',
+    date: '2026-06-12',
+    startTime: '17:30',
+    endTime: '20:00',
+    from: '市政务中心',
+    to: '广州酒家',
+    passenger: '专家团队',
+    passengerPhone: '13755556666',
+    passengerCount: 6,
+    description: '接送专家团队参加晚宴',
+    vehicleId: 'v-3',
+    driverId: 'd-4',
+    status: '待派发',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 3600000).toISOString(), operator: '调度员', remark: '创建任务' }
+    ]
+  },
+  {
+    id: 't-4',
+    activityId: 'act-1',
+    name: '外宾记者接机',
+    type: '接机服务',
+    date: '2026-06-10',
+    startTime: '09:00',
+    endTime: '11:00',
+    from: '白云机场T1',
+    to: '花园酒店',
+    passenger: '外宾记者团',
+    passengerPhone: '13744445555',
+    passengerCount: 4,
+    description: '接送外地媒体记者',
+    vehicleId: 'v-3',
+    driverId: 'd-1',
+    status: '已完成',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 172800000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 172800000).toISOString(), operator: '调度员', remark: '任务下发' },
+      { status: '已接收', time: new Date(Date.now() - 172800000).toISOString(), operator: '李师傅', remark: '接收任务' },
+      { status: '执行中', time: new Date(Date.now() - 172800000 + 3600000).toISOString(), operator: '系统', remark: '司机开始执行' },
+      { status: '已完成', time: new Date(Date.now() - 172800000 + 7200000).toISOString(), operator: '李师傅', remark: '任务完成，路况良好' }        
+    ]
+  },
+  {
+    id: 't-5',
+    activityId: 'act-1',
+    name: '外出参观',
+    type: '商务接待',
+    date: '2026-06-11',
+    startTime: '15:00',
+    endTime: '17:00',
+    from: '天河体育馆',
+    to: '番禺区',
+    passenger: '外出参观团',
+    passengerPhone: '13666667777',
+    passengerCount: 6,
+    description: '陪同外宾参观番禺景点',
+    vehicleId: 'v-1',
+    driverId: 'd-1',
+    status: '已拒绝',
+    rejectReason: '车辆故障，无法执行',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 86400000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 86400000).toISOString(), operator: '调度员', remark: '任务下发' },
+      { status: '已拒绝', time: new Date(Date.now() - 82800000).toISOString(), operator: '李师傅', remark: '车辆故障，无法执行' }
+    ]
+  },
+  {
+    id: 't-6',
+    activityId: 'act-1',
+    name: '临时会议用车',
+    type: '公务用车',
+    date: '2026-06-09',
+    startTime: '14:00',
+    endTime: '16:00',
+    from: '市政府',
+    to: '省人大',
+    passenger: '工作人员',
+    passengerPhone: '13588889999',
+    passengerCount: 3,
+    description: '临时会议用车需求',
+    vehicleId: 'v-2',
+    driverId: 'd-2',
+    status: '已取消',
+    cancelReason: '会议取消',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 259200000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 259200000).toISOString(), operator: '调度员', remark: '任务下发' },
+      { status: '已取消', time: new Date(Date.now() - 259200000 + 1800000).toISOString(), operator: '调度员', remark: '会议取消' }
+    ]
+  },
+  {
+    id: 't-7',
+    activityId: 'act-1',
+    name: '专家返程',
+    type: '接机服务',
+    date: '2026-06-12',
+    startTime: '16:00',
+    endTime: '18:00',
+    from: '东方酒店',
+    to: '白云机场T2',
+    passenger: '专家团队',
+    passengerPhone: '13900001111',
+    passengerCount: 3,
+    description: '送专家团队返程',
+    vehicleId: 'v-3',
+    driverId: 'd-1',
+    status: '待接收',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 36000000).toISOString(), operator: '调度员', remark: '任务下发' }
+    ]
+  },
+  {
+    id: 't-8',
+    activityId: 'act-2',
+    name: '考察团接机',
+    type: '接机服务',
+    date: '2026-06-18',
+    startTime: '08:00',
+    endTime: '10:00',
+    from: '深圳宝安机场',
+    to: '深圳会展中心',
+    passenger: '考察团成员',
+    passengerPhone: '13922223333',
+    passengerCount: 8,
+    description: '接待外地考察团',
+    status: '待派发',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 10800000).toISOString(), operator: '调度员', remark: '创建任务' }
+    ]
+  },
+  {
+    id: 't-9',
+    activityId: 'act-2',
+    name: '企业参观',
+    type: '公务用车',
+    date: '2026-06-19',
+    startTime: '09:00',
+    endTime: '12:00',
+    from: '深圳会展中心',
+    to: '华为总部',
+    passenger: '考察团成员',
+    passengerPhone: '13922223333',
+    passengerCount: 8,
+    description: '参观华为总部',
+    vehicleId: 'v-4',
+    status: '待派发',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 7200000).toISOString(), operator: '调度员', remark: '创建任务' }
+    ]
+  }
+];
