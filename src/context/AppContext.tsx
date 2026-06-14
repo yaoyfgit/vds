@@ -44,6 +44,8 @@ type Action =
   | { type: 'DELETE_DRIVER'; payload: { id: string } }
   | { type: 'SET_DRIVER_UNAVAILABLE'; payload: { id: string; reason: string; expectedReturnDate?: string } }
   | { type: 'SET_DRIVER_AVAILABLE'; payload: { id: string } }
+  | { type: 'ADD_SUPPLIER'; payload: Supplier }
+  | { type: 'UPDATE_SUPPLIER'; payload: { id: string; data: Partial<Supplier> } }
   | { type: 'ASSIGN_VEHICLE_TO_ACTIVITY'; payload: { activityId: string; vehicleId: string } }
   | { type: 'ASSIGN_DRIVER_TO_ACTIVITY'; payload: { activityId: string; driverId: string } }
   | { type: 'REMOVE_VEHICLE_FROM_ACTIVITY'; payload: { activityId: string; vehicleId: string } }
@@ -320,6 +322,15 @@ const reducer = (state: AppState, action: Action): AppState => {
                 expectedReturnDate: undefined
               }
             : driver
+        ),
+      };
+    case 'ADD_SUPPLIER':
+      return { ...state, suppliers: [...state.suppliers, action.payload] };
+    case 'UPDATE_SUPPLIER':
+      return {
+        ...state,
+        suppliers: state.suppliers.map(supplier =>
+          supplier.id === action.payload.id ? { ...supplier, ...action.payload.data } : supplier
         ),
       };
     case 'ASSIGN_VEHICLE_TO_ACTIVITY':

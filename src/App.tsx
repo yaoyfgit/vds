@@ -24,7 +24,7 @@ import PCLayout from './components/PC/PCLayout';
 import MobileLayout from './components/Mobile/MobileLayout';
 import Modal from './components/Modal';
 import { generateId, cn, getTaskAbnormalRules } from './lib/utils';
-import type { Task, Vehicle, Driver, Activity, ActivityStatus, ActivityPeriod, ResourceStatus, TaskStatus, AuditStatus } from './types';
+import type { Task, Vehicle, Driver, Activity, Supplier, ActivityStatus, ActivityPeriod, ResourceStatus, TaskStatus, AuditStatus, SupplierStatus } from './types';
 
 // Main App Component
 export default function App() {
@@ -62,7 +62,7 @@ export default function App() {
 
 // PC App with all the modal logic
 function PCApp() {
-  const { tasks, vehicles, drivers, activities, activeModal, modalData, dispatch } = useApp();
+  const { tasks, vehicles, drivers, activities, suppliers, activeModal, modalData, dispatch } = useApp();
 
   const [formData, setFormData] = useState<any>({});
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
@@ -265,6 +265,30 @@ function PCApp() {
           }
         }
       });
+      handleClose();
+    } else if (activeModal === 'NEW_SUPPLIER') {
+      const existingSupplier = suppliers.find(s => s.name === formData.name);
+      if (existingSupplier) {
+        alert('该供应商名称已存在，请检查后重新输入');
+        return;
+      }
+      const newSupplier: Supplier = {
+        id: generateId(),
+        name: formData.name,
+        type: formData.type || '租车公司',
+        contactName: formData.contactName,
+        contactPhone: formData.contactPhone,
+        backupPhone: formData.backupPhone,
+        address: formData.address,
+        creditCode: formData.creditCode,
+        contractStartDate: formData.contractStartDate,
+        contractEndDate: formData.contractEndDate,
+        contractNumber: formData.contractNumber,
+        notes: formData.notes,
+        status: '合作中' as SupplierStatus,
+        createdAt: new Date().toISOString()
+      };
+      dispatch({ type: 'ADD_SUPPLIER', payload: newSupplier });
       handleClose();
     } else if (activeModal === 'NEW_TASK') {
       if (!selectedActivityId) {
@@ -1104,6 +1128,154 @@ function PCApp() {
 
           <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-all">
             保存司机
+          </button>
+        </form>
+      </Modal>
+
+      {/* 新增供应商 Modal */}
+      <Modal isOpen={activeModal === 'NEW_SUPPLIER'} onClose={handleClose} title="新增供应商" size="xl">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                供应商名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                defaultValue={modalData?.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                placeholder="请输入供应商名称"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                供应商类型 <span className="text-red-500">*</span>
+              </label>
+              <select
+                defaultValue={modalData?.type || ''}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                required
+              >
+                <option value="">请选择类型</option>
+                <option value="租车公司">租车公司</option>
+                <option value="客运公司">客运公司</option>
+                <option value="个人车主">个人车主</option>
+                <option value="其他">其他</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                联系人 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                defaultValue={modalData?.contactName || ''}
+                onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                placeholder="请输入联系人姓名"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                联系电话 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                defaultValue={modalData?.contactPhone || ''}
+                onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                placeholder="请输入联系电话"
+                required
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">备用电话</label>
+              <input
+                type="tel"
+                defaultValue={modalData?.backupPhone || ''}
+                onChange={(e) => setFormData({ ...formData, backupPhone: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                placeholder="请输入备用电话"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">信用代码</label>
+              <input
+                type="text"
+                defaultValue={modalData?.creditCode || ''}
+                onChange={(e) => setFormData({ ...formData, creditCode: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                placeholder="请输入统一社会信用代码"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">公司地址</label>
+            <input
+              type="text"
+              defaultValue={modalData?.address || ''}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+              placeholder="请输入公司地址"
+            />
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">合作开始日期 <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                defaultValue={modalData?.contractStartDate || ''}
+                onChange={(e) => setFormData({ ...formData, contractStartDate: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">合作结束日期</label>
+              <input
+                type="date"
+                defaultValue={modalData?.contractEndDate || ''}
+                onChange={(e) => setFormData({ ...formData, contractEndDate: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">合同编号</label>
+              <input
+                type="text"
+                defaultValue={modalData?.contractNumber || ''}
+                onChange={(e) => setFormData({ ...formData, contractNumber: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                placeholder="请输入合同编号"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">备注</label>
+            <textarea
+              defaultValue={modalData?.notes || ''}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+              className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none resize-none transition-all"
+              placeholder="请输入备注信息"
+            />
+          </div>
+
+          <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-all">
+            保存供应商
           </button>
         </form>
       </Modal>

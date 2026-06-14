@@ -25,6 +25,7 @@ interface SupplierDetailProps {
 
 const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) => {
   const { vehicles, drivers } = useApp();
+  const [activeTab, setActiveTab] = useState<'info' | 'vehicles' | 'drivers'>('info');
 
   // 获取该供应商名下的车辆和司机
   const supplierVehicles = vehicles.filter(v => v.supplier === supplier.name);
@@ -93,232 +94,283 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-1 px-6 border-b border-slate-200 bg-slate-50">
+          <button
+            onClick={() => setActiveTab('info')}
+            className={cn(
+              "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+              activeTab === 'info'
+                ? "border-brand-500 text-brand-600"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            )}
+          >
+            基本信息
+          </button>
+          <button
+            onClick={() => setActiveTab('vehicles')}
+            className={cn(
+              "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
+              activeTab === 'vehicles'
+                ? "border-brand-500 text-brand-600"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <Car size={16} />
+            明细车辆
+            {supplierVehicles.length > 0 && (
+              <span className="bg-brand-100 text-brand-600 px-2 py-0.5 rounded-full text-xs">
+                {supplierVehicles.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('drivers')}
+            className={cn(
+              "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
+              activeTab === 'drivers'
+                ? "border-brand-500 text-brand-600"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <Users size={16} />
+            名下司机
+            {supplierDrivers.length > 0 && (
+              <span className="bg-brand-100 text-brand-600 px-2 py-0.5 rounded-full text-xs">
+                {supplierDrivers.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto">
-          {/* 基本信息 */}
-          <div className="p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <FileText size={18} />
-              基本信息
-            </h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">供应商类型：</span>
-                <span className="text-slate-900 font-medium">{supplier.type}</span>
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* 基本信息 Tab */}
+          {activeTab === 'info' && (
+            <>
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <FileText size={18} />
+                  基本信息
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">供应商类型：</span>
+                    <span className="text-slate-900 font-medium">{supplier.type}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">信用代码：</span>
+                    <span className="text-slate-900 font-medium">{supplier.creditCode || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">联系人：</span>
+                    <span className="text-slate-900 font-medium">{supplier.contactName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">联系电话：</span>
+                    <span className="text-slate-900 font-medium">{supplier.contactPhone}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">备用电话：</span>
+                    <span className="text-slate-900 font-medium">{supplier.backupPhone || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">公司地址：</span>
+                    <span className="text-slate-900 font-medium">{supplier.address || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">合作开始：</span>
+                    <span className="text-slate-900 font-medium">{supplier.contractStartDate}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">合作结束：</span>
+                    <span className="text-slate-900 font-medium">{supplier.contractEndDate || '长期合作'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 w-24">合同编号：</span>
+                    <span className="text-slate-900 font-medium">{supplier.contractNumber || '-'}</span>
+                  </div>
+                  {supplier.notes && (
+                    <div className="col-span-2 flex items-start gap-2">
+                      <span className="text-slate-500 w-24">备注：</span>
+                      <span className="text-slate-900 font-medium">{supplier.notes}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">信用代码：</span>
-                <span className="text-slate-900 font-medium">{supplier.creditCode || '-'}</span>
+
+              {/* 资源统计 */}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <TrendingUp size={18} />
+                  资源统计
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* 车辆统计 */}
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Car size={18} className="text-blue-500" />
+                      <h4 className="font-semibold text-slate-900">车辆资源</h4>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 text-center">
+                      <div>
+                        <p className="text-xl font-bold text-slate-900">{vehicleStats.total}</p>
+                        <p className="text-xs text-slate-500">总数</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-green-600">{vehicleStats.approved}</p>
+                        <p className="text-xs text-slate-500">通过</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-amber-600">{vehicleStats.pending}</p>
+                        <p className="text-xs text-slate-500">待审核</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-red-600">{vehicleStats.rejected}</p>
+                        <p className="text-xs text-slate-500">不通过</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-blue-600">{vehicleStats.available}</p>
+                        <p className="text-xs text-slate-500">可用</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 司机统计 */}
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users size={18} className="text-green-500" />
+                      <h4 className="font-semibold text-slate-900">司机资源</h4>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 text-center">
+                      <div>
+                        <p className="text-xl font-bold text-slate-900">{driverStats.total}</p>
+                        <p className="text-xs text-slate-500">总数</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-green-600">{driverStats.approved}</p>
+                        <p className="text-xs text-slate-500">通过</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-amber-600">{driverStats.pending}</p>
+                        <p className="text-xs text-slate-500">待审核</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-red-600">{driverStats.rejected}</p>
+                        <p className="text-xs text-slate-500">不通过</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-blue-600">{driverStats.available}</p>
+                        <p className="text-xs text-slate-500">可用</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">联系人：</span>
-                <span className="text-slate-900 font-medium">{supplier.contactName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">联系电话：</span>
-                <span className="text-slate-900 font-medium">{supplier.contactPhone}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">备用电话：</span>
-                <span className="text-slate-900 font-medium">{supplier.backupPhone || '-'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">公司地址：</span>
-                <span className="text-slate-900 font-medium">{supplier.address || '-'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">合作开始：</span>
-                <span className="text-slate-900 font-medium">{supplier.contractStartDate}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">合作结束：</span>
-                <span className="text-slate-900 font-medium">{supplier.contractEndDate || '长期合作'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 w-24">合同编号：</span>
-                <span className="text-slate-900 font-medium">{supplier.contractNumber || '-'}</span>
-              </div>
-              {supplier.notes && (
-                <div className="col-span-2 flex items-start gap-2">
-                  <span className="text-slate-500 w-24">备注：</span>
-                  <span className="text-slate-900 font-medium">{supplier.notes}</span>
+            </>
+          )}
+
+          {/* 明细车辆 Tab */}
+          {activeTab === 'vehicles' && (
+            <div>
+              {supplierVehicles.length > 0 ? (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold">
+                        <th className="px-4 py-3">车牌号</th>
+                        <th className="px-4 py-3">类型</th>
+                        <th className="px-4 py-3">品牌</th>
+                        <th className="px-4 py-3">审核状态</th>
+                        <th className="px-4 py-3">当前状态</th>
+                        <th className="px-4 py-3">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {supplierVehicles.map(vehicle => (
+                        <tr key={vehicle.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-semibold text-slate-900">{vehicle.plateNumber}</td>
+                          <td className="px-4 py-3 text-slate-600">{vehicle.type}</td>
+                          <td className="px-4 py-3 text-slate-600">{vehicle.brand || '-'}</td>
+                          <td className="px-4 py-3">
+                            <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[vehicle.auditStatus])}>
+                              {vehicle.auditStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn('px-2 py-1 rounded-full text-xs font-medium', resourceStatusStyles[vehicle.status])}>
+                              {vehicle.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button className="text-brand-600 text-sm font-medium flex items-center gap-1">
+                              <Eye size={14} />
+                              详情
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-xl p-8 text-center">
+                  <Car size={48} className="text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">该供应商暂无关联车辆</p>
                 </div>
               )}
             </div>
-          </div>
-
-          {/* 资源统计 */}
-          <div className="px-6 pb-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <TrendingUp size={18} />
-              资源统计
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {/* 车辆统计 */}
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Car size={18} className="text-blue-500" />
-                  <h4 className="font-semibold text-slate-900">车辆资源</h4>
-                </div>
-                <div className="grid grid-cols-5 gap-2 text-center">
-                  <div>
-                    <p className="text-xl font-bold text-slate-900">{vehicleStats.total}</p>
-                    <p className="text-xs text-slate-500">总数</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-green-600">{vehicleStats.approved}</p>
-                    <p className="text-xs text-slate-500">通过</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-amber-600">{vehicleStats.pending}</p>
-                    <p className="text-xs text-slate-500">待审核</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-red-600">{vehicleStats.rejected}</p>
-                    <p className="text-xs text-slate-500">不通过</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-blue-600">{vehicleStats.available}</p>
-                    <p className="text-xs text-slate-500">可用</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 司机统计 */}
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Users size={18} className="text-green-500" />
-                  <h4 className="font-semibold text-slate-900">司机资源</h4>
-                </div>
-                <div className="grid grid-cols-5 gap-2 text-center">
-                  <div>
-                    <p className="text-xl font-bold text-slate-900">{driverStats.total}</p>
-                    <p className="text-xs text-slate-500">总数</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-green-600">{driverStats.approved}</p>
-                    <p className="text-xs text-slate-500">通过</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-amber-600">{driverStats.pending}</p>
-                    <p className="text-xs text-slate-500">待审核</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-red-600">{driverStats.rejected}</p>
-                    <p className="text-xs text-slate-500">不通过</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-blue-600">{driverStats.available}</p>
-                    <p className="text-xs text-slate-500">可用</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 名下车辆 */}
-          {supplierVehicles.length > 0 && (
-            <div className="px-6 pb-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Car size={18} />
-                名下车辆
-              </h3>
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold">
-                      <th className="px-4 py-3">车牌号</th>
-                      <th className="px-4 py-3">类型</th>
-                      <th className="px-4 py-3">审核状态</th>
-                      <th className="px-4 py-3">当前状态</th>
-                      <th className="px-4 py-3">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {supplierVehicles.map(vehicle => (
-                      <tr key={vehicle.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-semibold text-slate-900">{vehicle.plateNumber}</td>
-                        <td className="px-4 py-3 text-slate-600">{vehicle.type}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[vehicle.auditStatus])}>
-                            {vehicle.auditStatus}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={cn('px-2 py-1 rounded-full text-xs font-medium', resourceStatusStyles[vehicle.status])}>
-                            {vehicle.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button className="text-brand-600 text-sm font-medium flex items-center gap-1">
-                            <Eye size={14} />
-                            详情
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           )}
 
-          {/* 名下司机 */}
-          {supplierDrivers.length > 0 && (
-            <div className="px-6 pb-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Users size={18} />
-                名下司机
-              </h3>
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold">
-                      <th className="px-4 py-3">姓名</th>
-                      <th className="px-4 py-3">手机号</th>
-                      <th className="px-4 py-3">驾照类型</th>
-                      <th className="px-4 py-3">审核状态</th>
-                      <th className="px-4 py-3">当前状态</th>
-                      <th className="px-4 py-3">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {supplierDrivers.map(driver => (
-                      <tr key={driver.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-semibold text-slate-900">{driver.name}</td>
-                        <td className="px-4 py-3 text-slate-600">{driver.phone}</td>
-                        <td className="px-4 py-3 text-slate-600">{driver.licenseType}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[driver.auditStatus])}>
-                            {driver.auditStatus}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={cn('px-2 py-1 rounded-full text-xs font-medium', resourceStatusStyles[driver.status])}>
-                            {driver.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button className="text-brand-600 text-sm font-medium flex items-center gap-1">
-                            <Eye size={14} />
-                            详情
-                          </button>
-                        </td>
+          {/* 名下司机 Tab */}
+          {activeTab === 'drivers' && (
+            <div>
+              {supplierDrivers.length > 0 ? (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold">
+                        <th className="px-4 py-3">姓名</th>
+                        <th className="px-4 py-3">手机号</th>
+                        <th className="px-4 py-3">驾照类型</th>
+                        <th className="px-4 py-3">审核状态</th>
+                        <th className="px-4 py-3">当前状态</th>
+                        <th className="px-4 py-3">操作</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* 空状态 */}
-          {supplierVehicles.length === 0 && supplierDrivers.length === 0 && (
-            <div className="px-6 pb-6">
-              <div className="bg-slate-50 rounded-xl p-8 text-center">
-                <Building size={48} className="text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">该供应商暂无关联车辆和司机</p>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {supplierDrivers.map(driver => (
+                        <tr key={driver.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-semibold text-slate-900">{driver.name}</td>
+                          <td className="px-4 py-3 text-slate-600">{driver.phone}</td>
+                          <td className="px-4 py-3 text-slate-600">{driver.licenseType}</td>
+                          <td className="px-4 py-3">
+                            <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[driver.auditStatus])}>
+                              {driver.auditStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn('px-2 py-1 rounded-full text-xs font-medium', resourceStatusStyles[driver.status])}>
+                              {driver.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button className="text-brand-600 text-sm font-medium flex items-center gap-1">
+                              <Eye size={14} />
+                              详情
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-xl p-8 text-center">
+                  <Users size={48} className="text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">该供应商暂无关联司机</p>
+                </div>
+              )}
             </div>
           )}
         </div>
