@@ -439,6 +439,13 @@ const VehiclesView = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">车辆管理</h2>
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_VEHICLE' } })}
+              className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            >
+              <Plus size={16} />
+              新增车辆
+            </button>
             <button className="text-slate-600 hover:text-slate-800 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium flex items-center gap-2">
               批量导入
             </button>
@@ -675,6 +682,13 @@ const DriversView = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">司机管理</h2>
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_DRIVER' } })}
+              className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            >
+              <Plus size={16} />
+              新增司机
+            </button>
             <button className="text-slate-600 hover:text-slate-800 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium flex items-center gap-2">
               批量导入
             </button>

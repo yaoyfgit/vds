@@ -70,6 +70,7 @@ function PCApp() {
   const [vehicleAvailableRanges, setVehicleAvailableRanges] = useState<{from: string, to: string}[]>([]);
   const [driverAvailableRanges, setDriverAvailableRanges] = useState<{from: string, to: string}[]>([]);
   const [cancelReason, setCancelReason] = useState('');
+  const [selectedActivityId, setSelectedActivityId] = useState<string>('');
 
   const handleClose = () => {
     dispatch({ type: 'CLOSE_MODAL' });
@@ -79,6 +80,7 @@ function PCApp() {
     setVehicleAvailableRanges([]);
     setDriverAvailableRanges([]);
     setCancelReason('');
+    setSelectedActivityId('');
   };
 
   const checkTimeConflicts = (vehicleId: string | undefined, driverId: string | undefined, taskDate: string, startTime: string, endTime: string, excludeTaskId?: string) => {
@@ -198,6 +200,7 @@ function PCApp() {
         contactPhone: formData.contactPhone,
         availableRanges: vehicleAvailableRanges,
         notes: formData.notes,
+        activityId: selectedActivityId || undefined,
         status: '可调配' as ResourceStatus,
         auditStatus: '待审核' as AuditStatus,
         auditMaterials: {
@@ -240,6 +243,7 @@ function PCApp() {
         emergencyContact: formData.emergencyContact,
         emergencyPhone: formData.emergencyPhone,
         notes: formData.notes,
+        activityId: selectedActivityId || undefined,
         status: '可调配' as ResourceStatus,
         auditStatus: '待审核' as AuditStatus,
         auditMaterials: {
@@ -263,6 +267,10 @@ function PCApp() {
       });
       handleClose();
     } else if (activeModal === 'NEW_TASK') {
+      if (!selectedActivityId) {
+        alert('请选择所属活动');
+        return;
+      }
       const newTask: Task = {
         id: generateId(),
         name: formData.name,
@@ -278,7 +286,7 @@ function PCApp() {
         description: formData.description,
         vehicleId: formData.vehicleId,
         driverId: formData.driverId,
-        activityId: modalData?.id || '',
+        activityId: selectedActivityId || modalData?.id || '',
         fieldDispatcher: formData.fieldDispatcher || '当前用户',
         status: '待派发' as TaskStatus,
         history: []
@@ -597,7 +605,10 @@ function PCApp() {
               <div className="flex justify-between items-center mb-4">
                 <h4 className="font-bold text-slate-700">任务列表 ({tasks.filter(t => t.activityId === modalData.id).length})</h4>
                 <button 
-                  onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_TASK', data: modalData } })}
+                  onClick={() => {
+                    setSelectedActivityId(modalData.id);
+                    dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_TASK', data: modalData } });
+                  }}
                   className="text-brand-600 text-sm font-medium flex items-center gap-1"
                 >
                   <Plus size={14} /> 新建任务
@@ -701,6 +712,25 @@ function PCApp() {
 
       <Modal isOpen={activeModal === 'NEW_VEHICLE' || activeModal === 'EDIT_VEHICLE'} onClose={handleClose} title={activeModal === 'NEW_VEHICLE' ? '新增车辆' : '编辑车辆'} size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 活动选择 */}
+          {activeModal === 'NEW_VEHICLE' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                所属活动
+              </label>
+              <select
+                value={selectedActivityId}
+                onChange={(e) => setSelectedActivityId(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              >
+                <option value="">不关联活动</option>
+                {activities.filter(a => a.period !== '结束期').map(activity => (
+                  <option key={activity.id} value={activity.id}>{activity.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -870,6 +900,25 @@ function PCApp() {
 
       <Modal isOpen={activeModal === 'NEW_DRIVER' || activeModal === 'EDIT_DRIVER'} onClose={handleClose} title={activeModal === 'NEW_DRIVER' ? '新增司机' : '编辑司机'} size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 活动选择 */}
+          {activeModal === 'NEW_DRIVER' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                所属活动
+              </label>
+              <select
+                value={selectedActivityId}
+                onChange={(e) => setSelectedActivityId(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              >
+                <option value="">不关联活动</option>
+                {activities.filter(a => a.period !== '结束期').map(activity => (
+                  <option key={activity.id} value={activity.id}>{activity.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -1033,9 +1082,23 @@ function PCApp() {
 
       <Modal isOpen={activeModal === 'NEW_TASK' || activeModal === 'EDIT_TASK'} onClose={handleClose} title={activeModal === 'NEW_TASK' ? '新建任务' : '编辑任务'} size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {activeModal === 'NEW_TASK' && modalData && (
-            <div className="bg-brand-50 p-3 rounded-xl">
-              <p className="text-sm text-brand-700">所属活动：{modalData.name || '未设置'}</p>
+          {/* 活动选择 */}
+          {activeModal === 'NEW_TASK' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                所属活动 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={selectedActivityId}
+                onChange={(e) => setSelectedActivityId(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                required
+              >
+                <option value="">请选择活动</option>
+                {activities.filter(a => a.period !== '结束期').map(activity => (
+                  <option key={activity.id} value={activity.id}>{activity.name}</option>
+                ))}
+              </select>
             </div>
           )}
           
