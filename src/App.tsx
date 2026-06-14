@@ -720,7 +720,21 @@ function PCApp() {
               </label>
               <select
                 value={selectedActivityId}
-                onChange={(e) => setSelectedActivityId(e.target.value)}
+                onChange={(e) => {
+                  const activityId = e.target.value;
+                  setSelectedActivityId(activityId);
+                  // 选择活动后自动设置可用日期为活动日期范围
+                  if (activityId) {
+                    const activity = activities.find(a => a.id === activityId);
+                    if (activity) {
+                      const startDate = activity.startTime.split(' ')[0];
+                      const endDate = activity.endTime.split(' ')[0];
+                      setVehicleAvailableRanges([{ from: startDate, to: endDate }]);
+                    }
+                  } else {
+                    setVehicleAvailableRanges([]);
+                  }
+                }}
                 className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
               >
                 <option value="">不关联活动</option>
@@ -908,7 +922,21 @@ function PCApp() {
               </label>
               <select
                 value={selectedActivityId}
-                onChange={(e) => setSelectedActivityId(e.target.value)}
+                onChange={(e) => {
+                  const activityId = e.target.value;
+                  setSelectedActivityId(activityId);
+                  // 选择活动后自动设置可用日期为活动日期范围
+                  if (activityId) {
+                    const activity = activities.find(a => a.id === activityId);
+                    if (activity) {
+                      const startDate = activity.startTime.split(' ')[0];
+                      const endDate = activity.endTime.split(' ')[0];
+                      setDriverAvailableRanges([{ from: startDate, to: endDate }]);
+                    }
+                  } else {
+                    setDriverAvailableRanges([]);
+                  }
+                }}
                 className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
               >
                 <option value="">不关联活动</option>
