@@ -1,4 +1,73 @@
-import type { Activity, Vehicle, Driver, Task } from '../types';
+import type { Activity, Vehicle, Driver, Task, Supplier, AuditRecord } from '../types';
+
+export const suppliers: Supplier[] = [
+  {
+    id: 'sup-1',
+    name: '安迅租车',
+    type: '租车公司',
+    creditCode: '914401007837856789',
+    contactName: '张经理',
+    contactPhone: '13800138001',
+    backupPhone: '13900139001',
+    address: '广州市天河区天河路123号',
+    contractStartDate: '2024-01-01',
+    status: '合作中',
+    contractNumber: 'HT-2024-001',
+    notes: '长期合作供应商',
+    createdAt: '2024-01-01'
+  },
+  {
+    id: 'sup-2',
+    name: '恒通租车',
+    type: '租车公司',
+    creditCode: '914401007837856790',
+    contactName: '李经理',
+    contactPhone: '13900139001',
+    address: '广州市白云区机场路456号',
+    contractStartDate: '2024-06-01',
+    status: '合作中',
+    contractNumber: 'HT-2024-005',
+    createdAt: '2024-06-01'
+  },
+  {
+    id: 'sup-3',
+    name: '远大客运',
+    type: '客运公司',
+    creditCode: '914401007837856791',
+    contactName: '王经理',
+    contactPhone: '13600136001',
+    address: '广州市番禺区迎宾路789号',
+    contractStartDate: '2023-01-01',
+    contractEndDate: '2026-12-31',
+    status: '合作中',
+    contractNumber: 'HT-2023-001',
+    createdAt: '2023-01-01'
+  },
+  {
+    id: 'sup-4',
+    name: '顺达车行',
+    type: '租车公司',
+    creditCode: '914401007837856792',
+    contactName: '陈经理',
+    contactPhone: '13700137001',
+    address: '广州市黄埔区科学城大道100号',
+    contractStartDate: '2025-01-01',
+    status: '暂停合作',
+    contractNumber: 'HT-2025-002',
+    notes: '服务质量问题暂停合作',
+    createdAt: '2025-01-01'
+  },
+  {
+    id: 'sup-5',
+    name: '诚信车队',
+    type: '个人车主',
+    contactName: '赵师傅',
+    contactPhone: '13500135001',
+    contractStartDate: '2024-03-01',
+    status: '合作中',
+    createdAt: '2024-03-01'
+  }
+];
 
 export const activities: Activity[] = [
   {
@@ -9,6 +78,8 @@ export const activities: Activity[] = [
     location: '广州市政务中心',
     description: '智慧城市建设专题研讨会，邀请国内外专家参加',
     status: '进行中',
+    period: '执行期',
+    managers: ['调度员-陈某', '调度员-李某'],
     vehicleIds: ['v-1', 'v-2', 'v-3'],
     driverIds: ['d-1', 'd-2']
   },
@@ -20,6 +91,8 @@ export const activities: Activity[] = [
     location: '深圳会展中心',
     description: '接待外地企业考察团',
     status: '筹备中',
+    period: '筹备期',
+    managers: ['调度员-陈某'],
     vehicleIds: ['v-1', 'v-4'],
     driverIds: ['d-1', 'd-2']
   },
@@ -31,6 +104,8 @@ export const activities: Activity[] = [
     location: '市政府大礼堂',
     description: '年度工作总结会议',
     status: '已结束',
+    period: '结束期',
+    managers: ['调度员-陈某'],
     vehicleIds: [],
     driverIds: []
   }
@@ -46,10 +121,19 @@ export const vehicles: Vehicle[] = [
     color: '黑色',
     licenseRequired: 'C1',
     supplier: '安迅租车',
+    supplierId: 'sup-1',
     contactPhone: '13800138001',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     notes: '车况良好，定期保养',
-    status: '可调配'
+    status: '可调配',
+    auditStatus: '审核通过',
+    activityId: 'act-1',
+    auditMaterials: {
+      vehiclePhotos: ['vehicle/v-1/photo1.jpg', 'vehicle/v-1/photo2.jpg'],
+      inspectionCert: ['vehicle/v-1/inspection.pdf'],
+      insurance: ['vehicle/v-1/insurance.pdf'],
+      other: []
+    }
   },
   {
     id: 'v-2',
@@ -60,10 +144,19 @@ export const vehicles: Vehicle[] = [
     color: '黑色',
     licenseRequired: 'C1',
     supplier: '安迅租车',
+    supplierId: 'sup-1',
     contactPhone: '13800138001',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     notes: '新车，舒适性好',
-    status: '执行中'
+    status: '执行中',
+    auditStatus: '审核通过',
+    activityId: 'act-1',
+    auditMaterials: {
+      vehiclePhotos: ['vehicle/v-2/photo1.jpg'],
+      inspectionCert: ['vehicle/v-2/inspection.pdf'],
+      insurance: ['vehicle/v-2/insurance.pdf'],
+      other: []
+    }
   },
   {
     id: 'v-3',
@@ -74,10 +167,19 @@ export const vehicles: Vehicle[] = [
     color: '白色',
     licenseRequired: 'C1',
     supplier: '恒通租车',
+    supplierId: 'sup-2',
     contactPhone: '13900139001',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     notes: '适合长途出行',
-    status: '可调配'
+    status: '可调配',
+    auditStatus: '审核通过',
+    activityId: 'act-2',
+    auditMaterials: {
+      vehiclePhotos: ['vehicle/v-3/photo1.jpg', 'vehicle/v-3/photo2.jpg', 'vehicle/v-3/photo3.jpg'],
+      inspectionCert: ['vehicle/v-3/inspection.pdf'],
+      insurance: ['vehicle/v-3/insurance.pdf'],
+      other: []
+    }
   },
   {
     id: 'v-4',
@@ -88,10 +190,19 @@ export const vehicles: Vehicle[] = [
     color: '白色',
     licenseRequired: 'B1',
     supplier: '恒通租车',
+    supplierId: 'sup-2',
     contactPhone: '13900139001',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     notes: '适合团队出行',
-    status: '可调配'
+    status: '可调配',
+    auditStatus: '待审核',
+    activityId: 'act-1',
+    auditMaterials: {
+      vehiclePhotos: ['vehicle/v-4/photo1.jpg'],
+      inspectionCert: ['vehicle/v-4/inspection.pdf'],
+      insurance: ['vehicle/v-4/insurance.pdf'],
+      other: ['vehicle/v-4/other.pdf']
+    }
   },
   {
     id: 'v-5',
@@ -102,11 +213,43 @@ export const vehicles: Vehicle[] = [
     color: '黄色',
     licenseRequired: 'A1',
     supplier: '远大客运',
+    supplierId: 'sup-3',
     contactPhone: '13600136001',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     notes: '大型客车，适合大型团队',
     status: '不可用',
-    unavailableReason: '维修保养中'
+    auditStatus: '审核通过',
+    unavailableReason: '维修保养中',
+    activityId: 'act-3',
+    auditMaterials: {
+      vehiclePhotos: ['vehicle/v-5/photo1.jpg', 'vehicle/v-5/photo2.jpg'],
+      inspectionCert: ['vehicle/v-5/inspection.pdf'],
+      insurance: ['vehicle/v-5/insurance.pdf'],
+      other: []
+    }
+  },
+  {
+    id: 'v-6',
+    plateNumber: '粤A11111',
+    type: '轿车',
+    brand: '奔驰E级',
+    capacity: 5,
+    color: '黑色',
+    licenseRequired: 'C1',
+    supplier: '顺达车行',
+    supplierId: 'sup-4',
+    contactPhone: '13700137001',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    notes: '豪华轿车',
+    status: '可调配',
+    auditStatus: '审核不通过',
+    auditRemark: '保险过期，需重新提交',
+    auditMaterials: {
+      vehiclePhotos: ['vehicle/v-6/photo1.jpg'],
+      inspectionCert: ['vehicle/v-6/inspection.pdf'],
+      insurance: [],
+      other: []
+    }
   }
 ];
 
@@ -120,10 +263,18 @@ export const drivers: Driver[] = [
     licenseExpiry: '2030-01-01',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     supplier: '安迅租车',
+    supplierId: 'sup-1',
+    activityId: 'act-1',
     emergencyContact: '张女士',
     emergencyPhone: '13987654321',
     notes: '10年驾龄，熟悉广州市区路线',
-    status: '可调配'
+    status: '可调配',
+    auditStatus: '审核通过',
+    auditMaterials: {
+      licenseFront: ['driver/d-1/license-front.jpg'],
+      licenseBack: ['driver/d-1/license-back.jpg'],
+      other: []
+    }
   },
   {
     id: 'd-2',
@@ -134,10 +285,18 @@ export const drivers: Driver[] = [
     licenseExpiry: '2029-05-05',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     supplier: '安迅租车',
+    supplierId: 'sup-1',
+    activityId: 'act-1',
     emergencyContact: '李先生',
     emergencyPhone: '13812345678',
     notes: '15年驾龄，可驾驶中巴车',
-    status: '执行中'
+    status: '执行中',
+    auditStatus: '审核通过',
+    auditMaterials: {
+      licenseFront: ['driver/d-2/license-front.jpg'],
+      licenseBack: ['driver/d-2/license-back.jpg'],
+      other: []
+    }
   },
   {
     id: 'd-3',
@@ -148,12 +307,20 @@ export const drivers: Driver[] = [
     licenseExpiry: '2028-10-10',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     supplier: '远大客运',
+    supplierId: 'sup-3',
+    activityId: 'act-3',
     emergencyContact: '王女士',
     emergencyPhone: '13733334444',
     notes: '20年驾龄，专业大巴司机',
     status: '不可用',
+    auditStatus: '审核通过',
     unavailableReason: '请假中',
-    expectedReturnDate: '2026-06-15'
+    expectedReturnDate: '2026-06-15',
+    auditMaterials: {
+      licenseFront: ['driver/d-3/license-front.jpg'],
+      licenseBack: ['driver/d-3/license-back.jpg'],
+      other: []
+    }
   },
   {
     id: 'd-4',
@@ -164,10 +331,134 @@ export const drivers: Driver[] = [
     licenseExpiry: '2032-03-03',
     availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
     supplier: '恒通租车',
+    supplierId: 'sup-2',
+    activityId: 'act-1',
     emergencyContact: '陈太太',
     emergencyPhone: '13855556666',
     notes: '8年驾龄，自动挡专业司机',
-    status: '可调配'
+    status: '可调配',
+    auditStatus: '待审核',
+    auditMaterials: {
+      licenseFront: ['driver/d-4/license-front.jpg'],
+      licenseBack: ['driver/d-4/license-back.jpg'],
+      other: ['driver/d-4/other.pdf']
+    }
+  },
+  {
+    id: 'd-5',
+    name: '赵师傅',
+    phone: '13566667777',
+    idCardNumber: '440101199005055678',
+    licenseType: 'C1',
+    licenseExpiry: '2031-06-15',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    supplier: '诚信车队',
+    supplierId: 'sup-5',
+    emergencyContact: '赵太太',
+    emergencyPhone: '13988889999',
+    notes: '5年驾龄，服务态度好',
+    status: '可调配',
+    auditStatus: '审核不通过',
+    auditRemark: '驾驶证照片不清晰，请重新上传',
+    auditMaterials: {
+      licenseFront: ['driver/d-5/license-front.jpg'],
+      licenseBack: [],
+      other: []
+    }
+  }
+];
+
+export const auditRecords: AuditRecord[] = [
+  {
+    id: 'audit-1',
+    resourceType: 'vehicle',
+    resourceId: 'v-1',
+    resourceName: '粤A12345',
+    supplier: '安迅租车',
+    activityId: 'act-1',
+    activityName: '广州市政府会议保障',
+    submitTime: '2026-06-01T09:00:00',
+    auditResult: '通过',
+    auditor: '王主管',
+    auditTime: '2026-06-01T10:30:00'
+  },
+  {
+    id: 'audit-2',
+    resourceType: 'vehicle',
+    resourceId: 'v-2',
+    resourceName: '粤A23456',
+    supplier: '安迅租车',
+    activityId: 'act-1',
+    activityName: '广州市政府会议保障',
+    submitTime: '2026-06-01T09:30:00',
+    auditResult: '通过',
+    auditor: '王主管',
+    auditTime: '2026-06-01T11:00:00'
+  },
+  {
+    id: 'audit-3',
+    resourceType: 'driver',
+    resourceId: 'd-1',
+    resourceName: '李师傅',
+    supplier: '安迅租车',
+    activityId: 'act-1',
+    activityName: '广州市政府会议保障',
+    submitTime: '2026-06-01T10:00:00',
+    auditResult: '通过',
+    auditor: '王主管',
+    auditTime: '2026-06-01T14:00:00'
+  },
+  {
+    id: 'audit-4',
+    resourceType: 'driver',
+    resourceId: 'd-2',
+    resourceName: '王师傅',
+    supplier: '安迅租车',
+    activityId: 'act-1',
+    activityName: '广州市政府会议保障',
+    submitTime: '2026-06-01T10:30:00',
+    auditResult: '通过',
+    auditor: '王主管',
+    auditTime: '2026-06-01T14:30:00'
+  },
+  {
+    id: 'audit-5',
+    resourceType: 'vehicle',
+    resourceId: 'v-3',
+    resourceName: '粤A34567',
+    supplier: '远大客运',
+    activityId: 'act-3',
+    activityName: '深圳展会接待',
+    submitTime: '2026-06-02T08:00:00',
+    auditResult: '驳回',
+    auditRemark: '车辆照片不清晰，请重新上传',
+    auditor: '李主管',
+    auditTime: '2026-06-02T09:30:00'
+  },
+  {
+    id: 'audit-6',
+    resourceType: 'driver',
+    resourceId: 'd-5',
+    resourceName: '赵师傅',
+    supplier: '诚信车队',
+    submitTime: '2026-06-03T14:00:00',
+    auditResult: '驳回',
+    auditRemark: '驾驶证照片不清晰，请重新上传',
+    auditor: '王主管',
+    auditTime: '2026-06-03T15:00:00'
+  },
+  {
+    id: 'audit-7',
+    resourceType: 'vehicle',
+    resourceId: 'v-4',
+    resourceName: '粤B88888',
+    supplier: '恒通租车',
+    activityId: 'act-1',
+    activityName: '广州市政府会议保障',
+    submitTime: '2026-06-05T10:00:00',
+    auditResult: '通过',
+    auditor: '王主管',
+    auditTime: '2026-06-05T11:30:00'
   }
 ];
 
@@ -188,6 +479,7 @@ export const tasks: Task[] = [
     description: '从机场接李局长到酒店',
     vehicleId: 'v-2',
     driverId: 'd-2',
+    fieldDispatcher: '陈某',
     status: '执行中',
     history: [
       { status: '待派发', time: new Date(Date.now() - 86400000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -212,6 +504,7 @@ export const tasks: Task[] = [
     description: '接送专家团队到会场',
     vehicleId: 'v-1',
     driverId: 'd-1',
+    fieldDispatcher: '陈某',
     status: '待接收',
     history: [
       { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -234,6 +527,7 @@ export const tasks: Task[] = [
     description: '陪同市长考察开发区',
     vehicleId: 'v-2',
     driverId: 'd-2',
+    fieldDispatcher: '陈某',
     status: '已接收',
     history: [
       { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -257,6 +551,7 @@ export const tasks: Task[] = [
     description: '接送专家团队参加晚宴',
     vehicleId: 'v-3',
     driverId: 'd-4',
+    fieldDispatcher: '陈某',
     status: '待派发',
     history: [
       { status: '待派发', time: new Date(Date.now() - 3600000).toISOString(), operator: '调度员', remark: '创建任务' }
@@ -278,6 +573,7 @@ export const tasks: Task[] = [
     description: '接送外地媒体记者',
     vehicleId: 'v-3',
     driverId: 'd-1',
+    fieldDispatcher: '陈某',
     status: '已完成',
     history: [
       { status: '待派发', time: new Date(Date.now() - 172800000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -303,6 +599,7 @@ export const tasks: Task[] = [
     description: '陪同外宾参观番禺景点',
     vehicleId: 'v-1',
     driverId: 'd-1',
+    fieldDispatcher: '陈某',
     status: '已拒绝',
     rejectReason: '车辆故障，无法执行',
     history: [

@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Activity, Vehicle, Driver, Task, TaskStatus } from '../types';
-import { activities, vehicles, drivers, tasks } from '../data/mockData';
+import { Activity, Vehicle, Driver, Task, TaskStatus, Supplier, AuditRecord } from '../types';
+import { activities, vehicles, drivers, tasks, suppliers, auditRecords } from '../data/mockData';
 
 interface AppState {
   activities: Activity[];
   vehicles: Vehicle[];
   drivers: Driver[];
   tasks: Task[];
+  suppliers: Supplier[];
+  auditRecords: AuditRecord[];
   activeModal: string | null;
   modalData: any;
 }
@@ -16,6 +18,8 @@ const initialState: AppState = {
   vehicles: vehicles,
   drivers: drivers,
   tasks: tasks,
+  suppliers: suppliers,
+  auditRecords: auditRecords,
   activeModal: null,
   modalData: null,
 };
@@ -44,6 +48,7 @@ type Action =
   | { type: 'ASSIGN_DRIVER_TO_ACTIVITY'; payload: { activityId: string; driverId: string } }
   | { type: 'REMOVE_VEHICLE_FROM_ACTIVITY'; payload: { activityId: string; vehicleId: string } }
   | { type: 'REMOVE_DRIVER_FROM_ACTIVITY'; payload: { activityId: string; driverId: string } }
+  | { type: 'ADD_AUDIT_RECORD'; payload: AuditRecord }
   | { type: 'OPEN_MODAL'; payload: { type: string; data?: any } }
   | { type: 'CLOSE_MODAL' };
 
@@ -357,6 +362,8 @@ const reducer = (state: AppState, action: Action): AppState => {
           return act;
         })
       };
+    case 'ADD_AUDIT_RECORD':
+      return { ...state, auditRecords: [...state.auditRecords, action.payload] };
     case 'OPEN_MODAL':
       return { ...state, activeModal: action.payload.type, modalData: action.payload.data };
     case 'CLOSE_MODAL':

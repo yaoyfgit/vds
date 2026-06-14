@@ -13,13 +13,18 @@ import {
   AlertCircle,
   History,
   UserPlus,
+  Map,
+  Play,
+  RotateCcw,
+  Clock,
+  Navigation,
 } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
 import PCLayout from './components/PC/PCLayout';
 import MobileLayout from './components/Mobile/MobileLayout';
 import Modal from './components/Modal';
-import { generateId, cn } from './lib/utils';
-import type { Task, Vehicle, Driver, Activity, ActivityStatus, ResourceStatus, TaskStatus } from './types';
+import { generateId, cn, getTaskAbnormalRules } from './lib/utils';
+import type { Task, Vehicle, Driver, Activity, ActivityStatus, ActivityPeriod, ResourceStatus, TaskStatus, AuditStatus } from './types';
 
 // Main App Component
 export default function App() {
@@ -57,7 +62,7 @@ export default function App() {
 
 // PC App with all the modal logic
 function PCApp() {
-  const { tasks, vehicles, drivers, activeModal, modalData, dispatch } = useApp();
+  const { tasks, vehicles, drivers, activities, activeModal, modalData, dispatch } = useApp();
 
   const [formData, setFormData] = useState<any>({});
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
@@ -167,6 +172,8 @@ function PCApp() {
         location: formData.location || '未设置',
         description: formData.description || '',
         status: '筹备中' as ActivityStatus,
+        period: '筹备期' as ActivityPeriod,
+        managers: ['调度员-陈某'],
         vehicleIds: selectedVehicles,
         driverIds: selectedDrivers
       };
@@ -187,10 +194,18 @@ function PCApp() {
         color: formData.color,
         licenseRequired: formData.licenseRequired || 'C1',
         supplier: formData.supplier || '',
+        supplierId: '',
         contactPhone: formData.contactPhone,
         availableRanges: vehicleAvailableRanges,
         notes: formData.notes,
-        status: '可调配' as ResourceStatus
+        status: '可调配' as ResourceStatus,
+        auditStatus: '待审核' as AuditStatus,
+        auditMaterials: {
+          vehiclePhotos: [],
+          inspectionCert: [],
+          insurance: [],
+          other: []
+        }
       };
       dispatch({ type: 'ADD_VEHICLE', payload: newVehicle });
       handleClose();
@@ -220,11 +235,18 @@ function PCApp() {
         licenseType: formData.licenseType || 'C1',
         licenseExpiry: formData.licenseExpiry,
         supplier: formData.supplier || '',
+        supplierId: '',
         availableRanges: driverAvailableRanges,
         emergencyContact: formData.emergencyContact,
         emergencyPhone: formData.emergencyPhone,
         notes: formData.notes,
-        status: '可调配' as ResourceStatus
+        status: '可调配' as ResourceStatus,
+        auditStatus: '待审核' as AuditStatus,
+        auditMaterials: {
+          licenseFront: [],
+          licenseBack: [],
+          other: []
+        }
       };
       dispatch({ type: 'ADD_DRIVER', payload: newDriver });
       handleClose();
@@ -252,10 +274,12 @@ function PCApp() {
         to: formData.to,
         passenger: formData.passenger,
         passengerPhone: formData.passengerPhone,
+        passengerCount: formData.passengerCount,
         description: formData.description,
         vehicleId: formData.vehicleId,
         driverId: formData.driverId,
         activityId: modalData?.id || '',
+        fieldDispatcher: formData.fieldDispatcher || '当前用户',
         status: '待派发' as TaskStatus,
         history: []
       };
@@ -1127,6 +1151,34 @@ function PCApp() {
           
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">乘车人数</label>
+              <input
+                type="number"
+                min="1"
+                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerCount : ''}
+                onChange={(e) => setFormData({ ...formData, passengerCount: parseInt(e.target.value) })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                placeholder="用于匹配车辆座位数"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">现场调度员 <span className="text-red-500">*</span></label>
+              <select
+                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fieldDispatcher : '当前用户'}
+                onChange={(e) => setFormData({ ...formData, fieldDispatcher: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                required
+              >
+                <option value="当前用户">当前用户（默认）</option>
+                <option value="陈某">陈某</option>
+                <option value="李某">李某</option>
+                <option value="王某">王某</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">分配车辆</label>
               <select
                 value={formData.vehicleId || ''}
@@ -1175,6 +1227,37 @@ function PCApp() {
       <Modal isOpen={activeModal === 'TASK_DETAIL'} onClose={handleClose} title="任务详情" size="xl">
         {modalData && (
           <div className="space-y-6">
+            {/* 异常标签区域 */}
+            {(() => {
+              const abnormalRules = getTaskAbnormalRules(modalData);
+              if (abnormalRules.length > 0) {
+                return (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle size={18} className="text-red-600" />
+                      <span className="font-bold text-red-700">异常任务</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {abnormalRules.map((rule, index) => (
+                        <span key={index} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm flex items-center gap-1">
+                          <span className="font-bold">{rule.code}</span>
+                          <span>{rule.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {abnormalRules.map((rule, index) => (
+                        <p key={index} className="text-xs text-red-600">
+                          {rule.code} {rule.name}：{rule.description}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+            
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-2xl font-bold text-slate-900">{modalData.name || '未命名任务'}</h3>
@@ -1184,8 +1267,10 @@ function PCApp() {
                 "px-4 py-2 rounded-full text-sm font-bold",
                 modalData.status === '执行中' ? "bg-green-100 text-green-700" :
                 modalData.status === '待接收' ? "bg-blue-100 text-blue-700" :
+                modalData.status === '已接收' ? "bg-purple-100 text-purple-700" :
                 modalData.status === '待派发' ? "bg-yellow-100 text-yellow-700" :
                 modalData.status === '已取消' ? "bg-red-100 text-red-700" :
+                modalData.status === '已拒绝' ? "bg-orange-100 text-orange-700" :
                 "bg-slate-100 text-slate-700"
               )}>{modalData.status || '未知'}</span>
             </div>
@@ -1201,6 +1286,17 @@ function PCApp() {
                 {modalData.passengerPhone && (
                   <p className="text-sm text-slate-500">{modalData.passengerPhone}</p>
                 )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 mb-1">乘车人数</p>
+                <p className="font-medium text-slate-900">{modalData.passengerCount || '未填写'}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 mb-1">现场调度员</p>
+                <p className="font-medium text-slate-900">{modalData.fieldDispatcher || '未指定'}</p>
               </div>
             </div>
 
@@ -1261,7 +1357,7 @@ function PCApp() {
                         </div>
                         <div>
                           <p className="font-medium text-slate-900">{d.name}</p>
-                          <p className="text-xs text-slate-500">{d.phone}</p>
+                          <p className="text-xs text-slate-500">{d.phone} · {d.licenseType}</p>
                         </div>
                       </div>
                     ) : (
@@ -1281,10 +1377,173 @@ function PCApp() {
               </div>
             )}
 
+            {modalData.rejectReason && (
+              <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                <p className="text-xs text-orange-600 mb-1">拒绝原因</p>
+                <p className="text-orange-800">{modalData.rejectReason}</p>
+              </div>
+            )}
+
             {modalData.cancelReason && (
               <div className="bg-red-50 p-4 rounded-xl border border-red-200">
                 <p className="text-xs text-red-600 mb-1">取消原因</p>
                 <p className="text-red-800">{modalData.cancelReason}</p>
+              </div>
+            )}
+
+            {/* 轨迹区域 */}
+            {['执行中', '已完成'].includes(modalData.status || '') && (
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <Map size={16} className="text-brand-600" />
+                    任务轨迹
+                  </h4>
+                  {modalData.status === '执行中' && (
+                    <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
+                      <Navigation size={12} />
+                      定位中
+                    </span>
+                  )}
+                </div>
+                <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                  <div className="aspect-video bg-gradient-to-br from-brand-50 to-blue-50 flex items-center justify-center relative">
+                    {/* 模拟地图背景 */}
+                    <div className="absolute inset-0 opacity-30">
+                      <div className="w-full h-full" style={{
+                        backgroundImage: `
+                          linear-gradient(90deg, #e2e8f0 1px, transparent 1px),
+                          linear-gradient(#e2e8f0 1px, transparent 1px)
+                        `,
+                        backgroundSize: '20px 20px'
+                      }} />
+                    </div>
+                    
+                    {/* 出发地标记 */}
+                    <div className="absolute left-8 bottom-8 flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm">
+                      <div className="w-3 h-3 bg-green-500 rounded-full" />
+                      <span className="text-xs text-slate-600">{modalData.from}</span>
+                    </div>
+                    
+                    {/* 目的地标记 */}
+                    <div className="absolute right-8 bottom-8 flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm">
+                      <div className="w-3 h-3 bg-red-500 rounded-full" />
+                      <span className="text-xs text-slate-600">{modalData.to}</span>
+                    </div>
+                    
+                    {/* 轨迹线 */}
+                    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+                      <path 
+                        d="M 100 350 Q 200 250 400 200 T 700 100" 
+                        fill="none" 
+                        stroke="#3b82f6" 
+                        strokeWidth="3"
+                        strokeDasharray={modalData.status === '执行中' ? "10,5" : "none"}
+                        className={modalData.status === '执行中' ? "animate-pulse" : ""}
+                      />
+                    </svg>
+                    
+                    {/* 当前位置（执行中） */}
+                    {modalData.status === '执行中' && (
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <div className="relative">
+                          <div className="w-6 h-6 bg-blue-500 rounded-full animate-ping opacity-50" />
+                          <div className="absolute inset-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                            <Navigation size={14} className="text-white transform rotate-45" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {modalData.status === '已完成' && (
+                      <div className="text-center text-slate-400">
+                        <Map size={32} className="mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">任务已完成，轨迹已记录</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* 轨迹回放控制（已完成任务） */}
+                  {modalData.status === '已完成' && (
+                    <div className="p-3 border-t border-slate-200 bg-slate-50">
+                      <div className="flex items-center gap-4">
+                        <button className="p-2 bg-white rounded-lg hover:bg-slate-100 transition-colors">
+                          <RotateCcw size={16} className="text-slate-600" />
+                        </button>
+                        <button className="p-2 bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors">
+                          <Play size={16} className="text-white ml-0.5" />
+                        </button>
+                        <div className="flex-1">
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            defaultValue="0" 
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {['1x', '2x', '4x', '8x'].map((speed) => (
+                            <button 
+                              key={speed}
+                              className="px-2 py-1 text-xs text-slate-600 hover:bg-slate-200 rounded transition-colors"
+                            >
+                              {speed}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1">
+                          <Clock size={12} />
+                          00:00 / 00:45
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {modalData.history && modalData.history.length > 0 && (
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 mb-3">状态变更记录</p>
+                <div className="space-y-4">
+                  {[...modalData.history].reverse().map((item, index) => (
+                    <div key={index} className="flex gap-4">
+                      <div className="relative">
+                        <div className={cn(
+                          "w-3 h-3 rounded-full",
+                          index === 0 ? "bg-brand-500" : "bg-slate-300"
+                        )} />
+                        {index !== modalData.history.length - 1 && (
+                          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-px h-full bg-slate-300" />
+                        )}
+                      </div>
+                      <div className="flex-1 pb-4">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-xs font-medium",
+                            item.status === '执行中' ? "bg-green-100 text-green-700" :
+                            item.status === '待接收' ? "bg-blue-100 text-blue-700" :
+                            item.status === '已接收' ? "bg-purple-100 text-purple-700" :
+                            item.status === '待派发' ? "bg-yellow-100 text-yellow-700" :
+                            item.status === '已取消' ? "bg-red-100 text-red-700" :
+                            item.status === '已拒绝' ? "bg-orange-100 text-orange-700" :
+                            "bg-slate-100 text-slate-700"
+                          )}>{item.status}</span>
+                          {item.operator && (
+                            <span className="text-xs text-slate-500">{item.operator}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {new Date(item.time).toLocaleString('zh-CN')}
+                        </p>
+                        {item.remark && (
+                          <p className="text-sm text-slate-600 mt-1">{item.remark}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1315,6 +1574,15 @@ function PCApp() {
               {modalData.status === '待派发' && modalData.vehicleId && modalData.driverId && (
                 <button 
                   onClick={() => {
+                    const activity = activities.find(a => a.id === modalData.activityId);
+                    if (activity && activity.period !== '执行期') {
+                      alert('活动尚未开始，请在执行期派发任务');
+                      return;
+                    }
+                    if (!modalData.driverId) {
+                      alert('请先分配司机');
+                      return;
+                    }
                     dispatch({ type: 'ASSIGN_RESOURCE_TO_TASK', payload: { taskId: modalData.id, vehicleId: modalData.vehicleId, driverId: modalData.driverId } });
                     dispatch({ type: 'SET_TASK_STATUS', payload: { id: modalData.id, status: '待接收', reason: '任务下发' } });
                     handleClose();
