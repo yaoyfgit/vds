@@ -303,7 +303,10 @@ function PCApp() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         from: formData.from,
+        fromTime: formData.startTime,
         to: formData.to,
+        toTime: formData.endTime,
+        waypoints: formData.waypoints?.filter((w: { name: string }) => w.name.trim()) || undefined,
         passenger: formData.passenger,
         passengerPhone: formData.passengerPhone,
         passengerCount: formData.passengerCount,
@@ -1391,6 +1394,71 @@ function PCApp() {
             </div>
           </div>
           
+          {/* 途经点 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-700">途经点</label>
+              <button
+                type="button"
+                onClick={() => {
+                  const newWaypoints = [...(formData.waypoints || []), { name: '', order: (formData.waypoints?.length || 0) + 1, time: '' }];
+                  setFormData({ ...formData, waypoints: newWaypoints });
+                }}
+                className="text-brand-600 hover:text-brand-700 text-sm font-medium flex items-center gap-1"
+              >
+                <Plus size={14} />
+                添加途经点
+              </button>
+            </div>
+            {formData.waypoints && formData.waypoints.length > 0 ? (
+              <div className="space-y-2">
+                {formData.waypoints.map((waypoint, index) => (
+                  <div key={index} className="flex gap-2">
+                    <div className="flex items-center justify-center w-8 h-10 bg-slate-100 rounded-lg text-slate-500 text-sm font-medium">
+                      {index + 1}
+                    </div>
+                    <input
+                      type="text"
+                      value={waypoint.name}
+                      onChange={(e) => {
+                        const newWaypoints = [...(formData.waypoints || [])];
+                        newWaypoints[index] = { ...newWaypoints[index], name: e.target.value };
+                        setFormData({ ...formData, waypoints: newWaypoints });
+                      }}
+                      className="flex-1 p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                      placeholder="途经点名称"
+                    />
+                    <input
+                      type="time"
+                      value={waypoint.time || ''}
+                      onChange={(e) => {
+                        const newWaypoints = [...(formData.waypoints || [])];
+                        newWaypoints[index] = { ...newWaypoints[index], time: e.target.value };
+                        setFormData({ ...formData, waypoints: newWaypoints });
+                      }}
+                      className="w-32 p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                      placeholder="预计时间"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newWaypoints = (formData.waypoints || []).filter((_, i) => i !== index);
+                        setFormData({ ...formData, waypoints: newWaypoints });
+                      }}
+                      className="p-3 text-red-500 hover:text-red-700"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 bg-slate-50 rounded-xl text-slate-400 text-sm">
+                暂无途经点，点击上方按钮添加
+              </div>
+            )}
+          </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">乘车人</label>
@@ -1563,7 +1631,8 @@ function PCApp() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* 路线信息 */}
+            <div className="space-y-2">
               <div className="bg-slate-50 p-4 rounded-xl flex items-start gap-3">
                 <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center">
                   <MapPin size={16} className="text-brand-600" />
@@ -1571,8 +1640,28 @@ function PCApp() {
                 <div>
                   <p className="text-xs text-slate-500 mb-1">出发地</p>
                   <p className="font-medium text-slate-900">{modalData.from || '未设置'}</p>
+                  {modalData.fromTime && <p className="text-xs text-slate-400 mt-1">预计时间：{modalData.fromTime}</p>}
                 </div>
               </div>
+              
+              {/* 途经点 */}
+              {modalData.waypoints && modalData.waypoints.length > 0 && (
+                <div className="space-y-2">
+                  {modalData.waypoints.map((waypoint, index) => (
+                    <div key={index} className="bg-slate-50 p-4 rounded-xl flex items-start gap-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-500 mb-1">途经点 {index + 1}</p>
+                        <p className="font-medium text-slate-900">{waypoint.name}</p>
+                        {waypoint.time && <p className="text-xs text-slate-400 mt-1">预计时间：{waypoint.time}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
               <div className="bg-slate-50 p-4 rounded-xl flex items-start gap-3">
                 <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center">
                   <MapPin size={16} className="text-brand-600" />
@@ -1580,6 +1669,7 @@ function PCApp() {
                 <div>
                   <p className="text-xs text-slate-500 mb-1">目的地</p>
                   <p className="font-medium text-slate-900">{modalData.to || '未设置'}</p>
+                  {modalData.toTime && <p className="text-xs text-slate-400 mt-1">预计时间：{modalData.toTime}</p>}
                 </div>
               </div>
             </div>

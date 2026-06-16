@@ -74,9 +74,46 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
   const [rejectReason, setRejectReason] = useState('');
   const [completeRemark, setCompleteRemark] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  const [longPressTask, setLongPressTask] = useState<Task | null>(null);
+  const [longPressLocation, setLongPressLocation] = useState<string | null>(null);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
   const handleStatusChange = (taskId: string, newStatus: any, reason?: string, operator?: string) => {
     dispatch({ type: 'SET_TASK_STATUS', payload: { id: taskId, status: newStatus, reason, operator } });
+  };
+
+  const handleLocationTouchStart = (task: Task, location: string) => {
+    if (!['已接收', '执行中'].includes(task.status)) return;
+    if ((task.reachedLocations || []).includes(location)) return;
+    
+    const timer = window.setTimeout(() => {
+      setLongPressTask(task);
+      setLongPressLocation(location);
+    }, 500);
+    setLongPressTimer(timer);
+  };
+
+  const handleLocationTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  const handleConfirmArrival = () => {
+    if (longPressTask && longPressLocation) {
+      dispatch({
+        type: 'UPDATE_TASK',
+        payload: {
+          id: longPressTask.id,
+          data: {
+            reachedLocations: [...(longPressTask.reachedLocations || []), longPressLocation]
+          }
+        }
+      });
+      setLongPressTask(null);
+      setLongPressLocation(null);
+    }
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -237,13 +274,93 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                 <div className="w-3 h-3 rounded-full bg-slate-300" />
               </div>
               <div className="flex-1 space-y-3">
-                <div>
+                <div
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    handleLocationTouchStart(selectedTask, selectedTask.from);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                    handleLocationTouchEnd();
+                  }}
+                  onTouchCancel={(e) => {
+                    e.stopPropagation();
+                    handleLocationTouchEnd();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    (selectedTask.reachedLocations || []).includes(selectedTask.from) ? "bg-slate-100" : "bg-transparent"
+                  )}
+                >
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">出发地</p>
-                  <p className="text-sm text-slate-800 font-medium">{selectedTask.from}</p>
+                  <p className={cn(
+                    "text-sm font-medium",
+                    (selectedTask.reachedLocations || []).includes(selectedTask.from) ? "text-slate-400 line-through" : "text-slate-800"
+                  )}>{selectedTask.from}</p>
+                  {selectedTask.fromTime && <p className="text-xs text-slate-400">{selectedTask.fromTime}</p>}
                 </div>
-                <div>
+                
+                {/* 途经点 */}
+                {selectedTask.waypoints && selectedTask.waypoints.length > 0 && (
+                  <div className="space-y-2">
+                    {selectedTask.waypoints.map((waypoint, index) => (
+                      <div
+                        key={index}
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                          handleLocationTouchStart(selectedTask, waypoint.name);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          handleLocationTouchEnd();
+                        }}
+                        onTouchCancel={(e) => {
+                          e.stopPropagation();
+                          handleLocationTouchEnd();
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className={cn(
+                          "p-2 rounded-lg transition-colors",
+                          (selectedTask.reachedLocations || []).includes(waypoint.name) ? "bg-slate-100" : "bg-transparent"
+                        )}
+                      >
+                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">途经点 {index + 1}</p>
+                        <p className={cn(
+                          "text-sm font-medium",
+                          (selectedTask.reachedLocations || []).includes(waypoint.name) ? "text-slate-400 line-through" : "text-slate-800"
+                        )}>{waypoint.name}</p>
+                        {waypoint.time && <p className="text-xs text-slate-400">{waypoint.time}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    handleLocationTouchStart(selectedTask, selectedTask.to);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                    handleLocationTouchEnd();
+                  }}
+                  onTouchCancel={(e) => {
+                    e.stopPropagation();
+                    handleLocationTouchEnd();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    (selectedTask.reachedLocations || []).includes(selectedTask.to) ? "bg-slate-100" : "bg-transparent"
+                  )}
+                >
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">目的地</p>
-                  <p className="text-sm text-slate-800 font-medium">{selectedTask.to}</p>
+                  <p className={cn(
+                    "text-sm font-medium",
+                    (selectedTask.reachedLocations || []).includes(selectedTask.to) ? "text-slate-400 line-through" : "text-slate-800"
+                  )}>{selectedTask.to}</p>
+                  {selectedTask.toTime && <p className="text-xs text-slate-400">{selectedTask.toTime}</p>}
                 </div>
               </div>
             </div>
@@ -646,6 +763,52 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
               >
                 确认拒绝
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {longPressTask && longPressLocation && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900">确认到达</h3>
+              <button 
+                onClick={() => {
+                  setLongPressTask(null);
+                  setLongPressLocation(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-brand-50 rounded-xl p-4">
+                <p className="text-sm text-brand-700 font-medium mb-1">到达地点</p>
+                <p className="text-lg font-bold text-brand-900">{longPressLocation}</p>
+              </div>
+
+              <p className="text-sm text-slate-600">确认已到达该地点？</p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setLongPressTask(null);
+                    setLongPressLocation(null);
+                  }}
+                  className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleConfirmArrival}
+                  className="flex-1 bg-gradient-to-r from-brand-600 to-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:from-brand-700 hover:to-blue-700 transition-all shadow-md shadow-brand-200"
+                >
+                  确认到达
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -428,10 +428,26 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                 <div>
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">出发地</p>
                   <p className="text-sm text-slate-800 font-medium">{selectedTask.from}</p>
+                  {selectedTask.fromTime && <p className="text-xs text-slate-400">{selectedTask.fromTime}</p>}
                 </div>
+                
+                {/* 途经点 */}
+                {selectedTask.waypoints && selectedTask.waypoints.length > 0 && (
+                  <div className="space-y-2">
+                    {selectedTask.waypoints.map((waypoint, index) => (
+                      <div key={index}>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">途经点 {index + 1}</p>
+                        <p className="text-sm text-slate-800 font-medium">{waypoint.name}</p>
+                        {waypoint.time && <p className="text-xs text-slate-400">{waypoint.time}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
                 <div>
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">目的地</p>
                   <p className="text-sm text-slate-800 font-medium">{selectedTask.to}</p>
+                  {selectedTask.toTime && <p className="text-xs text-slate-400">{selectedTask.toTime}</p>}
                 </div>
               </div>
             </div>

@@ -52,6 +52,7 @@ export interface Activity {
   managers: string[];
   vehicleIds: string[];
   driverIds: string[];
+  supplierIds: string[];
 }
 
 export interface Vehicle {
@@ -115,7 +116,10 @@ export interface Task {
   startTime: string;
   endTime: string;
   from: string;
+  fromTime?: string;
   to: string;
+  toTime?: string;
+  waypoints?: { name: string; order: number; time?: string }[];
   passenger?: string;
   passengerPhone?: string;
   passengerCount?: number;
@@ -127,6 +131,7 @@ export interface Task {
   rejectReason?: string;
   cancelReason?: string;
   remark?: string;
+  reachedLocations?: string[];
   history?: {
     status: TaskStatus;
     time: string;
