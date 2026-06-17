@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import {
-  CheckCircle2,
-  XCircle,
   Eye,
   CheckSquare,
   Square
@@ -18,6 +16,9 @@ const AuditManagementView = () => {
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [activityFilter, setActivityFilter] = useState<string>('');
   const [supplierFilter, setSupplierFilter] = useState<string>('');
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [historySupplierFilter, setHistorySupplierFilter] = useState<string>('');
+  const [historySearchKeyword, setHistorySearchKeyword] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
@@ -37,6 +38,12 @@ const AuditManagementView = () => {
     if (typeFilter && item.resourceType !== typeFilter) return false;
     if (activityFilter && item.activityId !== activityFilter) return false;
     if (supplierFilter && item.supplier !== supplierFilter) return false;
+    if (searchKeyword) {
+      const keyword = searchKeyword.toLowerCase();
+      const name = item.resourceType === 'vehicle' ? item.plateNumber : item.name;
+      const phone = item.resourceType === 'driver' ? item.phone : '';
+      return name?.toLowerCase().includes(keyword) || phone?.toLowerCase().includes(keyword);
+    }
     return true;
   });
 
@@ -48,7 +55,11 @@ const AuditManagementView = () => {
   const filteredAuditRecords = auditRecords.filter(record => {
     if (typeFilter && record.resourceType !== typeFilter) return false;
     if (activityFilter && record.activityId !== activityFilter) return false;
-    if (supplierFilter && record.supplier !== supplierFilter) return false;
+    if (historySupplierFilter && record.supplier !== historySupplierFilter) return false;
+    if (historySearchKeyword) {
+      const keyword = historySearchKeyword.toLowerCase();
+      return record.resourceName?.toLowerCase().includes(keyword);
+    }
     return true;
   }).sort((a, b) => new Date(b.auditTime).getTime() - new Date(a.auditTime).getTime());
 
@@ -78,7 +89,7 @@ const AuditManagementView = () => {
             id: vehicle.id,
             data: {
               auditStatus: batchAction === 'approve' ? '审核通过' : '审核不通过',
-              status: batchAction === 'approve' ? '可调配' : '可调配',
+              status: batchAction === 'approve' ? '可调配' : '不可用',
               auditRemark: batchAction === 'reject' ? batchRemark : undefined
             }
           }
@@ -107,7 +118,7 @@ const AuditManagementView = () => {
             id: driver.id,
             data: {
               auditStatus: batchAction === 'approve' ? '审核通过' : '审核不通过',
-              status: batchAction === 'approve' ? '可调配' : '可调配',
+              status: batchAction === 'approve' ? '可调配' : '不可用',
               auditRemark: batchAction === 'reject' ? batchRemark : undefined
             }
           }
@@ -134,68 +145,6 @@ const AuditManagementView = () => {
     setShowBatchModal(false);
     setSelectedItems([]);
     setBatchRemark('');
-  };
-
-  const handleAudit = (item: typeof pendingResources[0], action: 'approve' | 'reject', remark?: string) => {
-    if (item.resourceType === 'vehicle') {
-      dispatch({
-        type: 'UPDATE_VEHICLE',
-        payload: {
-          id: item.id,
-          data: {
-            auditStatus: action === 'approve' ? '审核通过' : '审核不通过',
-            status: action === 'approve' ? '可调配' : '可调配',
-            auditRemark: action === 'reject' ? remark : undefined
-          }
-        }
-      });
-      dispatch({
-        type: 'ADD_AUDIT_RECORD',
-        payload: {
-          id: `audit-${Date.now()}`,
-          resourceType: 'vehicle',
-          resourceId: item.id,
-          resourceName: item.plateNumber,
-          supplier: item.supplier,
-          activityId: item.activityId,
-          activityName: activities.find(a => a.id === item.activityId)?.name,
-          submitTime: new Date().toISOString(),
-          auditResult: action === 'approve' ? '通过' : '驳回',
-          auditRemark: action === 'reject' ? remark : undefined,
-          auditor: '王主管',
-          auditTime: new Date().toISOString()
-        }
-      });
-    } else {
-      dispatch({
-        type: 'UPDATE_DRIVER',
-        payload: {
-          id: item.id,
-          data: {
-            auditStatus: action === 'approve' ? '审核通过' : '审核不通过',
-            status: action === 'approve' ? '可调配' : '可调配',
-            auditRemark: action === 'reject' ? remark : undefined
-          }
-        }
-      });
-      dispatch({
-        type: 'ADD_AUDIT_RECORD',
-        payload: {
-          id: `audit-${Date.now()}`,
-          resourceType: 'driver',
-          resourceId: item.id,
-          resourceName: item.name,
-          supplier: item.supplier,
-          activityId: item.activityId,
-          activityName: activities.find(a => a.id === item.activityId)?.name,
-          submitTime: new Date().toISOString(),
-          auditResult: action === 'approve' ? '通过' : '驳回',
-          auditRemark: action === 'reject' ? remark : undefined,
-          auditor: '王主管',
-          auditTime: new Date().toISOString()
-        }
-      });
-    }
   };
 
   return (
@@ -274,6 +223,16 @@ const AuditManagementView = () => {
                   </select>
                 </div>
               )}
+              <div className="w-64">
+                <label className="block text-sm font-medium text-slate-700 mb-1">车牌/司机搜索</label>
+                <input
+                  type="text"
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  placeholder="输入车牌或司机姓名"
+                  className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                />
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -364,40 +323,19 @@ const AuditManagementView = () => {
                             {activity?.name || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  if (item.resourceType === 'vehicle') {
-                                    setSelectedVehicle(item as Vehicle);
-                                  } else {
-                                    setSelectedDriver(item as Driver);
-                                  }
-                                }}
-                                className="text-brand-600 hover:text-brand-800 flex items-center gap-1"
-                              >
-                                <Eye size={14} />
-                                详情
-                              </button>
-                              <button
-                                onClick={() => handleAudit(item, 'approve')}
-                                className="text-green-600 hover:text-green-800 flex items-center gap-1"
-                              >
-                                <CheckCircle2 size={14} />
-                                通过
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const remark = prompt('请输入驳回原因：');
-                                  if (remark) {
-                                    handleAudit(item, 'reject', remark);
-                                  }
-                                }}
-                                className="text-red-600 hover:text-red-800 flex items-center gap-1"
-                              >
-                                <XCircle size={14} />
-                                驳回
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => {
+                                if (item.resourceType === 'vehicle') {
+                                  setSelectedVehicle(item as Vehicle);
+                                } else {
+                                  setSelectedDriver(item as Driver);
+                                }
+                              }}
+                              className="text-brand-600 hover:text-brand-800 flex items-center gap-1"
+                            >
+                              <Eye size={14} />
+                              详情
+                            </button>
                           </td>
                         </tr>
                       );
@@ -442,6 +380,29 @@ const AuditManagementView = () => {
                   ))}
                 </select>
               </div>
+              <div className="w-48">
+                <label className="block text-sm font-medium text-slate-700 mb-1">供应商筛选</label>
+                <select
+                  value={historySupplierFilter}
+                  onChange={(e) => setHistorySupplierFilter(e.target.value)}
+                  className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                >
+                  <option value="">全部供应商</option>
+                  {[...new Set(auditRecords.map(r => r.supplier).filter(Boolean))].map(supplier => (
+                    <option key={supplier} value={supplier}>{supplier}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-64">
+                <label className="block text-sm font-medium text-slate-700 mb-1">车牌/司机搜索</label>
+                <input
+                  type="text"
+                  value={historySearchKeyword}
+                  onChange={(e) => setHistorySearchKeyword(e.target.value)}
+                  placeholder="输入车牌或司机姓名"
+                  className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                />
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -457,51 +418,73 @@ const AuditManagementView = () => {
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">驳回原因</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">审核人</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">审核时间</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">操作</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-slate-200">
-                    {filteredAuditRecords.map(record => (
-                      <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={cn(
-                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                            record.resourceType === 'vehicle'
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-green-100 text-green-800"
-                          )}>
-                            {record.resourceType === 'vehicle' ? '车辆' : '司机'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                          {record.resourceName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {record.supplier}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {record.activityName || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={cn(
-                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                            record.auditResult === '通过'
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          )}>
-                            {record.auditResult}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {record.auditRemark || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {record.auditor}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {new Date(record.auditTime).toLocaleString('zh-CN')}
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredAuditRecords.map(record => {
+                      const vehicle = vehicles.find(v => v.id === record.resourceId);
+                      const driver = drivers.find(d => d.id === record.resourceId);
+                      return (
+                        <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn(
+                              "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                              record.resourceType === 'vehicle'
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-green-100 text-green-800"
+                            )}>
+                              {record.resourceType === 'vehicle' ? '车辆' : '司机'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                            {record.resourceName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            {record.supplier}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            {record.activityName || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn(
+                              "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                              record.auditResult === '通过'
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            )}>
+                              {record.auditResult}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            {record.auditRemark || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            {record.auditor}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            {new Date(record.auditTime).toLocaleString('zh-CN')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {record.auditResult === '通过' && (vehicle || driver) && (
+                              <button
+                                onClick={() => {
+                                  if (record.resourceType === 'vehicle' && vehicle) {
+                                    setSelectedVehicle(vehicle);
+                                  } else if (record.resourceType === 'driver' && driver) {
+                                    setSelectedDriver(driver);
+                                  }
+                                }}
+                                className="text-brand-600 hover:text-brand-800 flex items-center gap-1"
+                              >
+                                <Eye size={14} />
+                                详情
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

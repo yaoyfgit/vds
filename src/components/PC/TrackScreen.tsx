@@ -5,10 +5,12 @@ import { useApp } from '../../context/AppContext';
 import type { Activity, Driver, Task } from '../../types';
 
 const TrackScreen: React.FC = () => {
-  const { activities, tasks, drivers } = useApp();
+  const { activities, tasks, drivers, dispatch } = useApp();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showAllFutureTasks, setShowAllFutureTasks] = useState(false);
+  const [driverFilter, setDriverFilter] = useState('');
 
   // 默认选择第一个活动
   useEffect(() => {
@@ -44,6 +46,22 @@ const TrackScreen: React.FC = () => {
       )
     : [];
 
+  // 获取司机的未来任务（按开始时间升序）
+  const getDriverFutureTasks = (driver: Driver): Task[] => {
+    return tasks
+      .filter(t => 
+        t.driverId === driver.id && 
+        t.activityId === selectedActivity?.id && 
+        t.status !== '已完成' &&
+        t.status !== '已取消'
+      )
+      .sort((a, b) => {
+        const timeA = a.date + ' ' + a.startTime;
+        const timeB = b.date + ' ' + b.startTime;
+        return timeA.localeCompare(timeB);
+      });
+  };
+
   // 点击司机图标时显示司机信息卡片
   const handleDriverClick = (driver: Driver) => {
     setSelectedDriver(driver);
@@ -71,32 +89,26 @@ const TrackScreen: React.FC = () => {
 
   if (!selectedActivity) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <Map size={48} className="text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500">暂无活动数据</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (selectedActivity.period === '筹备期') {
-    return (
-      <div className="h-full flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <Map size={48} className="text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500">活动尚未开始，暂无轨迹数据</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (inProgressTasks.length === 0 && abnormalTasks.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <Map size={48} className="text-brand-300 mx-auto mb-4" />
-          <p className="text-slate-500">当前活动暂无执行中任务</p>
+      <div className="h-full flex flex-col bg-slate-50">
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-slate-600">活动：</span>
+              <select
+                value=""
+                disabled
+                className="px-3 py-2 bg-slate-100 rounded-lg border border-slate-200 text-sm text-slate-400"
+              >
+                <option value="">暂无活动</option>
+              </select>
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Map size={48} className="text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500">暂无活动数据</p>
+          </div>
         </div>
       </div>
     );
@@ -170,7 +182,22 @@ const TrackScreen: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* 地图区域 */}
         <div className="flex-1 relative bg-gradient-to-br from-blue-50 to-cyan-50 p-6">
-          {/* 地图背景网格 */}
+          {selectedActivity.period === '筹备期' ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-center">
+                <Map size={48} className="text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500">活动尚未开始，暂无轨迹数据</p>
+              </div>
+            </div>
+          ) : inProgressTasks.length === 0 && abnormalTasks.length === 0 ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-center">
+                <Map size={48} className="text-brand-300 mx-auto mb-4" />
+                <p className="text-slate-500">当前活动暂无执行中任务</p>
+              </div>
+            </div>
+          ) : (
+            <>
           <div className="absolute inset-6 opacity-20">
             <div className="w-full h-full" style={{
               backgroundImage: `
@@ -235,22 +262,30 @@ const TrackScreen: React.FC = () => {
               );
             })}
           </div>
+            </>
+        )}
         </div>
 
         {/* 右侧司机列表面板 */}
         <aside className="w-72 bg-white border-l border-slate-200 flex flex-col shrink-0">
           <div className="p-4 border-b border-slate-200">
             <h3 className="font-bold text-slate-900">司机列表</h3>
+            <input
+              type="text"
+              placeholder="搜索司机姓名"
+              className="mt-3 w-full px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 text-sm focus:border-brand-500 outline-none"
+              onChange={(e) => setDriverFilter(e.target.value)}
+            />
           </div>
 
           {/* 在线司机 */}
           <div className="p-4 border-b border-slate-100">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 bg-green-500 rounded-full" />
-              <span className="text-sm font-medium text-slate-700">在线 ({onlineDrivers.length})</span>
+              <span className="text-sm font-medium text-slate-700">在线 ({onlineDrivers.filter(d => d.name.includes(driverFilter)).length})</span>
             </div>
             <div className="space-y-2">
-              {onlineDrivers.map(driver => {
+              {onlineDrivers.filter(d => d.name.includes(driverFilter)).map(driver => {
                 const task = getDriverCurrentTask(driver);
                 return (
                   <button
@@ -265,7 +300,12 @@ const TrackScreen: React.FC = () => {
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-medium text-slate-900">{driver.name}</span>
-                      <Navigation size={14} className="text-green-500" />
+                      <div className="flex items-center gap-2">
+                        {task && task.status === '执行中' && (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded font-medium">执行中</span>
+                        )}
+                        <Navigation size={14} className="text-green-500" />
+                      </div>
                     </div>
                     {task && (
                       <p className="text-xs text-slate-500 truncate">{task.name}</p>
@@ -277,14 +317,14 @@ const TrackScreen: React.FC = () => {
           </div>
 
           {/* 异常司机 */}
-          {abnormalDrivers.length > 0 && (
+          {abnormalDrivers.filter(d => d.name.includes(driverFilter)).length > 0 && (
             <div className="p-4 border-b border-slate-100">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-sm font-medium text-red-600">异常 ({abnormalDrivers.length})</span>
+                <span className="text-sm font-medium text-red-600">异常 ({abnormalDrivers.filter(d => d.name.includes(driverFilter)).length})</span>
               </div>
               <div className="space-y-2">
-                {abnormalDrivers.map(driver => {
+                {abnormalDrivers.filter(d => d.name.includes(driverFilter)).map(driver => {
                   const task = abnormalTasks.find(t => t.driverId === driver.id);
                   return (
                     <button
@@ -312,14 +352,14 @@ const TrackScreen: React.FC = () => {
           )}
 
           {/* 离线司机 */}
-          {offlineDrivers.length > 0 && (
+          {offlineDrivers.filter(d => d.name.includes(driverFilter)).length > 0 && (
             <div className="p-4 flex-1 overflow-y-auto">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-slate-300 rounded-full" />
-                <span className="text-sm font-medium text-slate-500">离线 ({offlineDrivers.length})</span>
+                <span className="text-sm font-medium text-slate-500">离线 ({offlineDrivers.filter(d => d.name.includes(driverFilter)).length})</span>
               </div>
               <div className="space-y-2">
-                {offlineDrivers.map(driver => (
+                {offlineDrivers.filter(d => d.name.includes(driverFilter)).map(driver => (
                   <button
                     key={driver.id}
                     onClick={() => handleDriverClick(driver)}
@@ -378,7 +418,16 @@ const TrackScreen: React.FC = () => {
             <div className="p-6 space-y-4">
               {/* 当前任务 */}
               {getDriverCurrentTask(selectedDriver) && (
-                <div className="bg-slate-50 rounded-xl p-4">
+                <div 
+                  className="bg-slate-50 rounded-xl p-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                  onClick={() => {
+                    const task = getDriverCurrentTask(selectedDriver);
+                    if (task) {
+                      dispatch({ type: 'OPEN_MODAL', payload: { type: 'TASK_DETAIL', data: task } });
+                      setSelectedDriver(null);
+                    }
+                  }}
+                >
                   <p className="text-xs text-slate-500 mb-2">当前任务</p>
                   <div className="space-y-2">
                     <p className="font-bold text-slate-900">
@@ -427,19 +476,48 @@ const TrackScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* 现场调度员 */}
-              {getDriverCurrentTask(selectedDriver)?.fieldDispatcher && (
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 mb-1">现场调度员</p>
-                  <span className="font-medium">{getDriverCurrentTask(selectedDriver)?.fieldDispatcher}</span>
-                </div>
-              )}
-
-              {/* 操作按钮 */}
-              <button className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2">
-                <Phone size={18} />
-                拨打司机电话
-              </button>
+              {/* 即将执行 */}
+              {(() => {
+                const futureTasks = getDriverFutureTasks(selectedDriver);
+                if (futureTasks.length === 0) return null;
+                return (
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 mb-4">即将执行</p>
+                    <div className="space-y-10">
+                      {(showAllFutureTasks ? futureTasks : futureTasks.slice(0, 2)).map((task, index) => (
+                        <div 
+                          key={task.id} 
+                          className="flex items-center gap-3 p-6 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors border border-slate-200"
+                          onClick={() => {
+                            dispatch({ type: 'OPEN_MODAL', payload: { type: 'TASK_DETAIL', data: task } });
+                            setSelectedDriver(null);
+                          }}
+                        >
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-blue-600 text-xs font-bold">{index + 1}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-900 text-sm truncate">{task.name}</p>
+                            <p className="text-xs text-slate-500 flex items-center gap-1 mt-3">
+                              <Map size={12} className="text-slate-400" />
+                              {task.from} → {task.to}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-3">{task.date} {task.startTime}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {futureTasks.length > 2 && (
+                      <button 
+                        onClick={() => setShowAllFutureTasks(!showAllFutureTasks)}
+                        className="w-full mt-6 py-2 text-sm text-brand-600 hover:text-brand-700 font-medium"
+                      >
+                        {showAllFutureTasks ? '收起' : `展开更多 (${futureTasks.length - 2}个)`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

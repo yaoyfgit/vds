@@ -6,7 +6,6 @@ import {
   Image,
   CheckCircle2,
   XCircle,
-  Edit2,
   Download,
   AlertCircle,
   CreditCard
@@ -21,12 +20,13 @@ interface DriverDetailProps {
 }
 
 const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
-  const { activities, dispatch } = useApp();
+  const { activities, drivers, dispatch } = useApp();
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditAction, setAuditAction] = useState<'approve' | 'reject'>('approve');
   const [auditRemark, setAuditRemark] = useState('');
 
-  const activity = activities.find(a => a.id === driver.activityId);
+  const currentDriver = drivers.find((d: Driver) => d.id === driver.id) || driver;
+  const activity = activities.find(a => a.id === currentDriver.activityId);
   const statusStyles = {
     '可调配': 'bg-green-100 text-green-700',
     '已调度': 'bg-blue-100 text-blue-700',
@@ -45,10 +45,10 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
     dispatch({
       type: 'UPDATE_DRIVER',
       payload: {
-        id: driver.id,
+        id: currentDriver.id,
         data: {
           auditStatus: newStatus,
-          status: auditAction === 'approve' ? '可调配' : '可调配',
+          status: auditAction === 'approve' ? '可调配' : '不可用',
           auditRemark: auditAction === 'reject' ? auditRemark : undefined
         }
       }
@@ -68,19 +68,19 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
                 <Users size={24} className="text-brand-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900">{driver.name}</h2>
+                <h2 className="text-xl font-bold text-slate-900">{currentDriver.name}</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', statusStyles[driver.status])}>
-                    {driver.status}
+                  <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', statusStyles[currentDriver.status])}>
+                    {currentDriver.status}
                   </span>
-                  <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', auditStatusStyles[driver.auditStatus])}>
-                    {driver.auditStatus}
+                  <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', auditStatusStyles[currentDriver.auditStatus])}>
+                    {currentDriver.auditStatus}
                   </span>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {driver.auditStatus === '待审核' && (
+              {currentDriver.auditStatus === '待审核' && (
                 <button
                   onClick={() => setShowAuditModal(true)}
                   className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
@@ -89,10 +89,6 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
                   审核
                 </button>
               )}
-              <button className="text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2">
-                <Edit2 size={16} />
-                编辑
-              </button>
               <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
@@ -110,27 +106,27 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">姓名：</span>
-                  <span className="text-slate-900 font-medium">{driver.name}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">手机号：</span>
-                  <span className="text-slate-900 font-medium">{driver.phone}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.phone}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">身份证号：</span>
-                  <span className="text-slate-900 font-medium">{driver.idCardNumber || '-'}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.idCardNumber || '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">驾照类型：</span>
-                  <span className="text-slate-900 font-medium">{driver.licenseType}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.licenseType}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">驾照有效期：</span>
-                  <span className="text-slate-900 font-medium">{driver.licenseExpiry || '-'}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.licenseExpiry || '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">所属供应商：</span>
-                  <span className="text-slate-900 font-medium">{driver.supplier}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.supplier}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">所属活动：</span>
@@ -139,35 +135,35 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">可用日期：</span>
                   <span className="text-slate-900 font-medium">
-                    {driver.availableRanges.length > 0 
-                      ? `${driver.availableRanges[0].from} 至 ${driver.availableRanges[0].to}` 
+                    {currentDriver.availableRanges.length > 0 
+                      ? `${currentDriver.availableRanges[0].from} 至 ${currentDriver.availableRanges[0].to}` 
                       : '-'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">紧急联系人：</span>
-                  <span className="text-slate-900 font-medium">{driver.emergencyContact || '-'}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.emergencyContact || '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">紧急联系电话：</span>
-                  <span className="text-slate-900 font-medium">{driver.emergencyPhone || '-'}</span>
+                  <span className="text-slate-900 font-medium">{currentDriver.emergencyPhone || '-'}</span>
                 </div>
-                {driver.unavailableReason && (
+                {currentDriver.unavailableReason && (
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500 w-24">不可用原因：</span>
-                    <span className="text-red-600 font-medium">{driver.unavailableReason}</span>
+                    <span className="text-red-600 font-medium">{currentDriver.unavailableReason}</span>
                   </div>
                 )}
-                {driver.auditRemark && driver.auditStatus === '审核不通过' && (
+                {currentDriver.auditRemark && currentDriver.auditStatus === '审核不通过' && (
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500 w-24">驳回原因：</span>
-                    <span className="text-red-600 font-medium">{driver.auditRemark}</span>
+                    <span className="text-red-600 font-medium">{currentDriver.auditRemark}</span>
                   </div>
                 )}
-                {driver.notes && (
+                {currentDriver.notes && (
                   <div className="col-span-2 flex items-start gap-2">
                     <span className="text-slate-500 w-24">备注：</span>
-                    <span className="text-slate-900 font-medium">{driver.notes}</span>
+                    <span className="text-slate-900 font-medium">{currentDriver.notes}</span>
                   </div>
                 )}
               </div>
@@ -181,11 +177,11 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               </h3>
               
               {/* 驾驶证正本 */}
-              {driver.auditMaterials.licenseFront.length > 0 && (
+              {currentDriver.auditMaterials.licenseFront.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">驾驶证正本</h4>
                   <div className="flex gap-2 flex-wrap">
-                    {driver.auditMaterials.licenseFront.map((_, index) => (
+                    {currentDriver.auditMaterials.licenseFront.map((_, index) => (
                       <div
                         key={index}
                         className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
@@ -198,11 +194,11 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               )}
 
               {/* 驾驶证副本 */}
-              {driver.auditMaterials.licenseBack.length > 0 && (
+              {currentDriver.auditMaterials.licenseBack.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">驾驶证副本</h4>
                   <div className="flex gap-2 flex-wrap">
-                    {driver.auditMaterials.licenseBack.map((_, index) => (
+                    {currentDriver.auditMaterials.licenseBack.map((_, index) => (
                       <div
                         key={index}
                         className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
@@ -215,11 +211,11 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               )}
 
               {/* 其他材料 */}
-              {driver.auditMaterials.other.length > 0 && (
+              {currentDriver.auditMaterials.other.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">其他材料</h4>
                   <div className="flex gap-2">
-                    {driver.auditMaterials.other.map((_, index) => (
+                    {currentDriver.auditMaterials.other.map((_, index) => (
                       <button
                         key={index}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
@@ -234,14 +230,14 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               )}
 
               {/* 材料缺失提示 */}
-              {(driver.auditMaterials.licenseFront.length === 0 || 
-               driver.auditMaterials.licenseBack.length === 0) && (
+              {(currentDriver.auditMaterials.licenseFront.length === 0 || 
+               currentDriver.auditMaterials.licenseBack.length === 0) && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
                   <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-amber-700">
                     <p className="font-semibold">审核材料不完整</p>
-                    <p>缺少：{driver.auditMaterials.licenseFront.length === 0 && '驾驶证正本 '}
-                      {driver.auditMaterials.licenseBack.length === 0 && '驾驶证副本'}</p>
+                    <p>缺少：{currentDriver.auditMaterials.licenseFront.length === 0 && '驾驶证正本 '}
+                      {currentDriver.auditMaterials.licenseBack.length === 0 && '驾驶证副本'}</p>
                   </div>
                 </div>
               )}

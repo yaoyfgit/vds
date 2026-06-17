@@ -27,8 +27,12 @@ import AuditManagementView from './AuditManagementView';
 import TrackScreen from './TrackScreen';
 import type { Activity, Vehicle, Driver } from '../../types';
 
-const PCLayout: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('activities');
+const PCLayout: React.FC<{
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  onNavigateToAudit?: () => void;
+  onNavigateToTasks?: (filterStatus?: string) => void;
+}> = ({ activeTab, onTabChange, onNavigateToAudit, onNavigateToTasks }) => {
   const { dispatch } = useApp();
 
   const navItems = [
@@ -56,7 +60,7 @@ const PCLayout: React.FC = () => {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => onTabChange(item.id)}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium",
                 activeTab === item.id 
@@ -98,17 +102,13 @@ const PCLayout: React.FC = () => {
               <Bell size={20} />
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">3</span>
             </button>
-            {activeTab !== 'audit' && (
+            {activeTab !== 'audit' && activeTab !== 'vehicles' && activeTab !== 'drivers' && (
               <button 
                 onClick={() => {
                   if (activeTab === 'activities') {
                     dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_ACTIVITY' } });
                   } else if (activeTab === 'tasks') {
                     dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_TASK' } });
-                  } else if (activeTab === 'vehicles') {
-                    dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_VEHICLE' } });
-                  } else if (activeTab === 'drivers') {
-                    dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_DRIVER' } });
                   } else if (activeTab === 'suppliers') {
                     dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_SUPPLIER' } });
                   }
@@ -118,8 +118,7 @@ const PCLayout: React.FC = () => {
                 <Plus size={18} />
                 {activeTab === 'activities' ? '新建活动' : 
                  activeTab === 'tasks' ? '新建任务' : 
-                 activeTab === 'vehicles' ? '新建车辆' :
-                 activeTab === 'suppliers' ? '新增供应商' : '新建司机'}
+                 '新增供应商'}
               </button>
             )}
           </div>
@@ -130,7 +129,10 @@ const PCLayout: React.FC = () => {
           "flex-1 overflow-hidden",
           activeTab === 'track' ? "p-0" : "p-8 overflow-y-auto"
         )}>
-          {activeTab === 'activities' && <ActivitiesView />}
+          {activeTab === 'activities' && <ActivitiesView 
+            onNavigateToAudit={onNavigateToAudit}
+            onNavigateToTasks={onNavigateToTasks}
+          />}
           {activeTab === 'tasks' && <TasksView />}
           {activeTab === 'track' && <TrackScreen />}
           {activeTab === 'audit' && <AuditManagementView />}
@@ -143,7 +145,10 @@ const PCLayout: React.FC = () => {
   );
 };
 
-const ActivitiesView = () => {
+const ActivitiesView: React.FC<{
+  onNavigateToAudit?: () => void;
+  onNavigateToTasks?: (filterStatus?: string) => void;
+}> = ({ onNavigateToAudit, onNavigateToTasks }) => {
   const { activities } = useApp();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
@@ -222,7 +227,9 @@ const ActivitiesView = () => {
       {selectedActivity && (
         <ActivityDetail 
           activity={selectedActivity} 
-          onClose={() => setSelectedActivity(null)} 
+          onClose={() => setSelectedActivity(null)}
+          onNavigateToAudit={onNavigateToAudit}
+          onNavigateToTasks={onNavigateToTasks}
         />
       )}
     </>
@@ -236,6 +243,7 @@ const TasksView = () => {
   const [filterDate, setFilterDate] = useState<string>('');
   const [filterDispatcher, setFilterDispatcher] = useState<string>('');
   const [filterAbnormal, setFilterAbnormal] = useState<string>('');
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
 
   const uniqueDispatchers = [...new Set(tasks.map(t => t.fieldDispatcher).filter(Boolean))];
 
@@ -250,6 +258,17 @@ const TasksView = () => {
     if (filterAbnormal === 'normal') {
       return task.status !== '已拒绝' && task.status !== '已取消';
     }
+    if (searchKeyword) {
+      const keyword = searchKeyword.toLowerCase();
+      const vehicle = vehicles.find(v => v.id === task.vehicleId);
+      const driver = drivers.find(d => d.id === task.driverId);
+      const matchName = task.name.toLowerCase().includes(keyword);
+      const matchVehicle = vehicle?.plateNumber?.toLowerCase().includes(keyword) || 
+                           vehicle?.brand?.toLowerCase().includes(keyword);
+      const matchDriver = driver?.name?.toLowerCase().includes(keyword) || 
+                          driver?.phone?.toLowerCase().includes(keyword);
+      return matchName || matchVehicle || matchDriver;
+    }
     return true;
   });
 
@@ -258,6 +277,19 @@ const TasksView = () => {
       <h2 className="text-2xl font-bold text-slate-900">任务调度</h2>
 
       <div className="flex gap-4 flex-wrap">
+        <div className="w-64">
+          <label className="block text-sm font-medium text-slate-700 mb-1">搜索</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder="任务名称、车辆、司机"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+            />
+          </div>
+        </div>
         <div className="w-48">
           <label className="block text-sm font-medium text-slate-700 mb-1">状态筛选</label>
           <select
@@ -416,6 +448,7 @@ const VehiclesView = () => {
   const [filterType, setFilterType] = useState<string>('');
   const [filterAuditStatus, setFilterAuditStatus] = useState<string>('');
   const [filterActivity, setFilterActivity] = useState<string>('');
+  const [filterPlateNumber, setFilterPlateNumber] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   const filteredVehicles = vehicles.filter(v => {
@@ -424,6 +457,7 @@ const VehiclesView = () => {
     if (filterType && v.type !== filterType) return false;
     if (filterAuditStatus && v.auditStatus !== filterAuditStatus) return false;
     if (filterActivity && v.activityId !== filterActivity) return false;
+    if (filterPlateNumber && !v.plateNumber.toLowerCase().includes(filterPlateNumber.toLowerCase())) return false;
     return true;
   });
 
@@ -456,6 +490,16 @@ const VehiclesView = () => {
         </div>
 
         <div className="flex gap-4 flex-wrap">
+          <div className="w-48">
+            <label className="block text-sm font-medium text-slate-700 mb-1">车牌号搜索</label>
+            <input
+              type="text"
+              value={filterPlateNumber}
+              onChange={(e) => setFilterPlateNumber(e.target.value)}
+              className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+              placeholder="输入车牌号"
+            />
+          </div>
           <div className="w-48">
             <label className="block text-sm font-medium text-slate-700 mb-1">状态筛选</label>
             <select
@@ -658,6 +702,7 @@ const DriversView = () => {
   const [supplierFilter, setSupplierFilter] = useState<string>('');
   const [auditStatusFilter, setAuditStatusFilter] = useState<string>('');
   const [activityFilter, setActivityFilter] = useState<string>('');
+  const [nameFilter, setNameFilter] = useState<string>('');
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
   const uniqueSuppliers = [...new Set(drivers.map(d => d.supplier).filter(Boolean))];
@@ -667,6 +712,7 @@ const DriversView = () => {
     if (supplierFilter && driver.supplier !== supplierFilter) return false;
     if (auditStatusFilter && driver.auditStatus !== auditStatusFilter) return false;
     if (activityFilter && driver.activityId !== activityFilter) return false;
+    if (nameFilter && !driver.name.toLowerCase().includes(nameFilter.toLowerCase())) return false;
     return true;
   });
 
@@ -699,6 +745,16 @@ const DriversView = () => {
         </div>
 
         <div className="flex flex-wrap gap-4">
+          <div className="w-48">
+            <label className="block text-sm font-medium text-slate-700 mb-1">司机名称搜索</label>
+            <input
+              type="text"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+              placeholder="输入司机名称"
+            />
+          </div>
           <div className="w-48">
             <label className="block text-sm font-medium text-slate-700 mb-1">状态筛选</label>
             <select

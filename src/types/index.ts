@@ -38,6 +38,11 @@ export interface Supplier {
   contractNumber?: string;
   notes?: string;
   createdAt: string;
+  attachments?: {
+    contractFiles: string[];
+    qualificationFiles: string[];
+    otherFiles: string[];
+  };
 }
 
 export interface Activity {

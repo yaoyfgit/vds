@@ -6,7 +6,6 @@ import {
   Image,
   CheckCircle2,
   XCircle,
-  Edit2,
   Download,
   AlertCircle
 } from 'lucide-react';
@@ -20,12 +19,13 @@ interface VehicleDetailProps {
 }
 
 const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
-  const { activities, dispatch } = useApp();
+  const { activities, vehicles, dispatch } = useApp();
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditAction, setAuditAction] = useState<'approve' | 'reject'>('approve');
   const [auditRemark, setAuditRemark] = useState('');
 
-  const activity = activities.find(a => a.id === vehicle.activityId);
+  const currentVehicle = vehicles.find((v: Vehicle) => v.id === vehicle.id) || vehicle;
+  const activity = activities.find(a => a.id === currentVehicle.activityId);
   const statusStyles = {
     '可调配': 'bg-green-100 text-green-700',
     '已调度': 'bg-blue-100 text-blue-700',
@@ -44,10 +44,10 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
     dispatch({
       type: 'UPDATE_VEHICLE',
       payload: {
-        id: vehicle.id,
+        id: currentVehicle.id,
         data: {
           auditStatus: newStatus,
-          status: auditAction === 'approve' ? '可调配' : '可调配',
+          status: auditAction === 'approve' ? '可调配' : '不可用',
           auditRemark: auditAction === 'reject' ? auditRemark : undefined
         }
       }
@@ -62,41 +62,37 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
         <div className="bg-white rounded-2xl w-[90vw] max-w-[1000px] h-[85vh] flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-slate-200">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center">
-                <Car size={24} className="text-brand-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">{vehicle.plateNumber}</h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', statusStyles[vehicle.status])}>
-                    {vehicle.status}
-                  </span>
-                  <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', auditStatusStyles[vehicle.auditStatus])}>
-                    {vehicle.auditStatus}
-                  </span>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center">
+                  <Car size={24} className="text-brand-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">{currentVehicle.plateNumber}</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', statusStyles[currentVehicle.status])}>
+                      {currentVehicle.status}
+                    </span>
+                    <span className={cn('px-3 py-1 rounded-full text-sm font-semibold', auditStatusStyles[currentVehicle.auditStatus])}>
+                      {currentVehicle.auditStatus}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {vehicle.auditStatus === '待审核' && (
-                <button
-                  onClick={() => setShowAuditModal(true)}
-                  className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-                >
-                  <FileText size={16} />
-                  审核
+              <div className="flex items-center gap-2">
+                {currentVehicle.auditStatus === '待审核' && (
+                  <button
+                    onClick={() => setShowAuditModal(true)}
+                    className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+                  >
+                    <FileText size={16} />
+                    审核
+                  </button>
+                )}
+                <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
                 </button>
-              )}
-              <button className="text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2">
-                <Edit2 size={16} />
-                编辑
-              </button>
-              <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
+              </div>
             </div>
-          </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -109,27 +105,27 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">车辆类型：</span>
-                  <span className="text-slate-900 font-medium">{vehicle.type}</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.type}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">品牌型号：</span>
-                  <span className="text-slate-900 font-medium">{vehicle.brand}</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.brand}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">核载人数：</span>
-                  <span className="text-slate-900 font-medium">{vehicle.capacity}人（不含司机）</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.capacity}人（不含司机）</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">车辆颜色：</span>
-                  <span className="text-slate-900 font-medium">{vehicle.color || '-'}</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.color || '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">适用驾照：</span>
-                  <span className="text-slate-900 font-medium">{vehicle.licenseRequired}</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.licenseRequired}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">所属供应商：</span>
-                  <span className="text-slate-900 font-medium">{vehicle.supplier}</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.supplier}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">所属活动：</span>
@@ -137,32 +133,32 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">联系电话：</span>
-                  <span className="text-slate-900 font-medium">{vehicle.contactPhone || '-'}</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.contactPhone || '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">可用日期：</span>
                   <span className="text-slate-900 font-medium">
-                    {vehicle.availableRanges.length > 0 
-                      ? `${vehicle.availableRanges[0].from} 至 ${vehicle.availableRanges[0].to}` 
+                    {currentVehicle.availableRanges.length > 0 
+                      ? `${currentVehicle.availableRanges[0].from} 至 ${currentVehicle.availableRanges[0].to}` 
                       : '-'}
                   </span>
                 </div>
-                {vehicle.unavailableReason && (
+                {currentVehicle.unavailableReason && (
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500 w-24">不可用原因：</span>
-                    <span className="text-red-600 font-medium">{vehicle.unavailableReason}</span>
+                    <span className="text-red-600 font-medium">{currentVehicle.unavailableReason}</span>
                   </div>
                 )}
-                {vehicle.auditRemark && vehicle.auditStatus === '审核不通过' && (
+                {currentVehicle.auditRemark && currentVehicle.auditStatus === '审核不通过' && (
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500 w-24">驳回原因：</span>
-                    <span className="text-red-600 font-medium">{vehicle.auditRemark}</span>
+                    <span className="text-red-600 font-medium">{currentVehicle.auditRemark}</span>
                   </div>
                 )}
-                {vehicle.notes && (
+                {currentVehicle.notes && (
                   <div className="col-span-2 flex items-start gap-2">
                     <span className="text-slate-500 w-24">备注：</span>
-                    <span className="text-slate-900 font-medium">{vehicle.notes}</span>
+                    <span className="text-slate-900 font-medium">{currentVehicle.notes}</span>
                   </div>
                 )}
               </div>
@@ -176,11 +172,11 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
               </h3>
               
               {/* 车辆照片 */}
-              {vehicle.auditMaterials.vehiclePhotos.length > 0 && (
+              {currentVehicle.auditMaterials.vehiclePhotos.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">车辆照片</h4>
                   <div className="flex gap-2 flex-wrap">
-                    {vehicle.auditMaterials.vehiclePhotos.map((_, index) => (
+                    {currentVehicle.auditMaterials.vehiclePhotos.map((_, index) => (
                       <div
                         key={index}
                         className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
@@ -193,11 +189,11 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
               )}
 
               {/* 年检合格证 */}
-              {vehicle.auditMaterials.inspectionCert.length > 0 && (
+              {currentVehicle.auditMaterials.inspectionCert.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">年检合格证</h4>
                   <div className="flex gap-2">
-                    {vehicle.auditMaterials.inspectionCert.map((_, index) => (
+                    {currentVehicle.auditMaterials.inspectionCert.map((_, index) => (
                       <button
                         key={index}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
@@ -212,11 +208,11 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
               )}
 
               {/* 保险单 */}
-              {vehicle.auditMaterials.insurance.length > 0 && (
+              {currentVehicle.auditMaterials.insurance.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">保险单</h4>
                   <div className="flex gap-2">
-                    {vehicle.auditMaterials.insurance.map((_, index) => (
+                    {currentVehicle.auditMaterials.insurance.map((_, index) => (
                       <button
                         key={index}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
@@ -231,11 +227,11 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
               )}
 
               {/* 其他材料 */}
-              {vehicle.auditMaterials.other.length > 0 && (
+              {currentVehicle.auditMaterials.other.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">其他材料</h4>
                   <div className="flex gap-2">
-                    {vehicle.auditMaterials.other.map((_, index) => (
+                    {currentVehicle.auditMaterials.other.map((_, index) => (
                       <button
                         key={index}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
@@ -250,16 +246,16 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
               )}
 
               {/* 材料缺失提示 */}
-              {(vehicle.auditMaterials.vehiclePhotos.length === 0 || 
-               vehicle.auditMaterials.inspectionCert.length === 0 || 
-               vehicle.auditMaterials.insurance.length === 0) && (
+              {(currentVehicle.auditMaterials.vehiclePhotos.length === 0 || 
+               currentVehicle.auditMaterials.inspectionCert.length === 0 || 
+               currentVehicle.auditMaterials.insurance.length === 0) && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
                   <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-amber-700">
                     <p className="font-semibold">审核材料不完整</p>
-                    <p>缺少：{vehicle.auditMaterials.vehiclePhotos.length === 0 && '车辆照片 '}
-                      {vehicle.auditMaterials.inspectionCert.length === 0 && '年检合格证 '}
-                      {vehicle.auditMaterials.insurance.length === 0 && '保险单'}</p>
+                    <p>缺少：{currentVehicle.auditMaterials.vehiclePhotos.length === 0 && '车辆照片 '}
+                      {currentVehicle.auditMaterials.inspectionCert.length === 0 && '年检合格证 '}
+                      {currentVehicle.auditMaterials.insurance.length === 0 && '保险单'}</p>
                   </div>
                 </div>
               )}

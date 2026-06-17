@@ -11,6 +11,12 @@ interface AppState {
   auditRecords: AuditRecord[];
   activeModal: string | null;
   modalData: any;
+  currentUser: {
+    id: string;
+    name: string;
+    role: 'admin' | 'supplier';
+    supplierId?: string;
+  };
 }
 
 const initialState: AppState = {
@@ -22,6 +28,12 @@ const initialState: AppState = {
   auditRecords: auditRecords,
   activeModal: null,
   modalData: null,
+  currentUser: {
+    id: 'user-1',
+    name: '安迅租车',
+    role: 'supplier',
+    supplierId: 'sup-1',
+  },
 };
 
 type Action =

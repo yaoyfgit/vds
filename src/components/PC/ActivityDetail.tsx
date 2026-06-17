@@ -29,9 +29,16 @@ import type { Activity, Vehicle, Driver, Task, ActivityPeriod, Supplier } from '
 interface ActivityDetailProps {
   activity: Activity;
   onClose: () => void;
+  onNavigateToAudit?: () => void;
+  onNavigateToTasks?: (filterStatus?: string) => void;
 }
 
-const ActivityDetail: React.FC<ActivityDetailProps> = ({ activity, onClose }) => {
+const ActivityDetail: React.FC<ActivityDetailProps> = ({ 
+  activity, 
+  onClose, 
+  onNavigateToAudit,
+  onNavigateToTasks
+}) => {
   const [activeTab, setActiveTab] = useState<'info' | 'suppliers' | 'vehicles' | 'drivers' | 'tasks' | 'track'>('info');
   const { tasks, vehicles, drivers, suppliers, dispatch } = useApp();
 
@@ -39,7 +46,16 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activity, onClose }) =>
   const activityTasks = tasks.filter(t => t.activityId === activity.id);
   const activityVehicles = vehicles.filter(v => activity.vehicleIds.includes(v.id));
   const activityDrivers = drivers.filter(d => activity.driverIds.includes(d.id));
-  const activitySuppliers = suppliers.filter(s => (activity.supplierIds || []).includes(s.id));
+
+  // 打开任务详情
+  const handleOpenTaskDetail = (task: Task) => {
+    dispatch({ type: 'OPEN_MODAL', payload: { type: 'TASK_DETAIL', data: task } });
+  };
+
+  // 打开新建任务
+  const handleOpenNewTask = () => {
+    dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_TASK', data: { id: activity.id } } });
+  };
 
   // 任务统计
   const taskStats = {
@@ -173,11 +189,18 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activity, onClose }) =>
               abnormalTasks={abnormalTasks}
               onStartActivity={handleStartActivity}
               onEndActivity={handleEndActivity}
+              onNavigateToAudit={() => {
+                onClose();
+                onNavigateToAudit && onNavigateToAudit();
+              }}
+              onNavigateToTasks={(filterStatus) => {
+                onClose();
+                onNavigateToTasks && onNavigateToTasks(filterStatus);
+              }}
             />
           )}
           {activeTab === 'suppliers' && (
             <ActivitySuppliersTab
-              suppliers={activitySuppliers}
               allSuppliers={suppliers}
               activity={activity}
             />
@@ -200,6 +223,8 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activity, onClose }) =>
               vehicles={vehicles}
               drivers={drivers}
               activity={activity}
+              onOpenTaskDetail={handleOpenTaskDetail}
+              onOpenNewTask={handleOpenNewTask}
             />
           )}
           {activeTab === 'track' && (
@@ -229,7 +254,18 @@ const ActivityInfoTab: React.FC<{
   abnormalTasks: Task[];
   onStartActivity: () => void;
   onEndActivity: () => void;
-}> = ({ activity, taskStats, auditStats, abnormalTasks, onStartActivity, onEndActivity }) => {
+  onNavigateToAudit?: () => void;
+  onNavigateToTasks?: (filterStatus?: string) => void;
+}> = ({ activity, taskStats, auditStats, abnormalTasks, onStartActivity, onEndActivity, onNavigateToAudit, onNavigateToTasks }) => {
+  const taskStatItems = [
+    { key: 'total', label: '任务总数', value: taskStats.total, color: 'text-slate-900', bg: 'bg-slate-50', filterStatus: '' },
+    { key: 'pending', label: '待派发', value: taskStats.pending, color: 'text-amber-600', bg: 'bg-amber-50', filterStatus: '待派发' },
+    { key: 'inProgress', label: '进行中', value: taskStats.inProgress, color: 'text-blue-600', bg: 'bg-blue-50', filterStatus: 'inProgress' },
+    { key: 'completed', label: '已完成', value: taskStats.completed, color: 'text-green-600', bg: 'bg-green-50', filterStatus: '已完成' },
+    { key: 'cancelled', label: '已取消', value: taskStats.cancelled, color: 'text-slate-600', bg: 'bg-slate-100', filterStatus: '已取消' },
+    { key: 'abnormal', label: '异常任务', value: taskStats.abnormal, color: 'text-red-600', bg: 'bg-red-50', filterStatus: '已拒绝' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* 基本信息 */}
@@ -268,18 +304,18 @@ const ActivityInfoTab: React.FC<{
       {activity.period === '筹备期' && (
         <button
           onClick={onStartActivity}
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
         >
-          <Play size={18} />
+          <Play size={16} />
           开始活动
         </button>
       )}
       {activity.period === '执行期' && (
         <button
           onClick={onEndActivity}
-          className="w-full bg-slate-600 hover:bg-slate-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+          className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
         >
-          <Square size={18} />
+          <Square size={16} />
           结束活动
         </button>
       )}
@@ -288,30 +324,19 @@ const ActivityInfoTab: React.FC<{
       <div className="bg-white border border-slate-200 rounded-xl p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-4">任务统计</h3>
         <div className="grid grid-cols-6 gap-4">
-          <div className="text-center p-4 bg-slate-50 rounded-lg">
-            <p className="text-2xl font-bold text-slate-900">{taskStats.total}</p>
-            <p className="text-xs text-slate-500 mt-1">任务总数</p>
-          </div>
-          <div className="text-center p-4 bg-amber-50 rounded-lg">
-            <p className="text-2xl font-bold text-amber-600">{taskStats.pending}</p>
-            <p className="text-xs text-slate-500 mt-1">待派发</p>
-          </div>
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <p className="text-2xl font-bold text-blue-600">{taskStats.inProgress}</p>
-            <p className="text-xs text-slate-500 mt-1">进行中</p>
-          </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <p className="text-2xl font-bold text-green-600">{taskStats.completed}</p>
-            <p className="text-xs text-slate-500 mt-1">已完成</p>
-          </div>
-          <div className="text-center p-4 bg-slate-100 rounded-lg">
-            <p className="text-2xl font-bold text-slate-600">{taskStats.cancelled}</p>
-            <p className="text-xs text-slate-500 mt-1">已取消</p>
-          </div>
-          <div className="text-center p-4 bg-red-50 rounded-lg">
-            <p className="text-2xl font-bold text-red-600">{taskStats.abnormal}</p>
-            <p className="text-xs text-slate-500 mt-1">异常任务</p>
-          </div>
+          {taskStatItems.map(item => (
+            <div 
+              key={item.key}
+              onClick={() => onNavigateToTasks && onNavigateToTasks(item.filterStatus)}
+              className={cn(
+                "text-center p-4 rounded-lg cursor-pointer hover:shadow-md transition-all",
+                item.bg
+              )}
+            >
+              <p className={cn("text-2xl font-bold", item.color)}>{item.value}</p>
+              <p className="text-xs text-slate-500 mt-1">{item.label}</p>
+            </div>
+          ))}
         </div>
 
         {/* 异常任务列表 */}
@@ -348,14 +373,20 @@ const ActivityInfoTab: React.FC<{
           </h3>
           <div className="grid grid-cols-2 gap-4">
             {auditStats.pendingVehicles > 0 && (
-              <div className="p-4 bg-red-50 rounded-lg border border-red-100">
+              <div 
+                onClick={() => onNavigateToAudit && onNavigateToAudit()}
+                className="p-4 bg-red-50 rounded-lg border border-red-100 cursor-pointer hover:shadow-md transition-all"
+              >
                 <p className="text-sm font-bold text-red-600">有新车辆待审核</p>
                 <p className="text-2xl font-bold text-red-700 mt-2">{auditStats.pendingVehicles}</p>
                 <button className="mt-2 text-sm text-brand-600 font-medium">去审核 →</button>
               </div>
             )}
             {auditStats.pendingDrivers > 0 && (
-              <div className="p-4 bg-red-50 rounded-lg border border-red-100">
+              <div 
+                onClick={() => onNavigateToAudit && onNavigateToAudit()}
+                className="p-4 bg-red-50 rounded-lg border border-red-100 cursor-pointer hover:shadow-md transition-all"
+              >
                 <p className="text-sm font-bold text-red-600">有新司机待审核</p>
                 <p className="text-2xl font-bold text-red-700 mt-2">{auditStats.pendingDrivers}</p>
                 <button className="mt-2 text-sm text-brand-600 font-medium">去审核 →</button>
@@ -372,23 +403,11 @@ const ActivityInfoTab: React.FC<{
 const ActivityVehiclesTab: React.FC<{
   vehicles: Vehicle[];
   activity: Activity;
-}> = ({ vehicles, activity }) => {
-  const auditStatusStyles = {
-    '待审核': 'bg-amber-100 text-amber-700',
-    '审核通过': 'bg-green-100 text-green-700',
-    '审核不通过': 'bg-red-100 text-red-700',
-  };
-
+}> = ({ vehicles }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-slate-900">关联车辆 ({vehicles.length})</h3>
-        {activity.period !== '结束期' && (
-          <button className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-            <UserPlus size={16} />
-            关联车辆
-          </button>
-        )}
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -398,26 +417,18 @@ const ActivityVehiclesTab: React.FC<{
               <th className="px-4 py-3">车牌号</th>
               <th className="px-4 py-3">类型</th>
               <th className="px-4 py-3">品牌</th>
-              <th className="px-4 py-3">审核状态</th>
+              <th className="px-4 py-3">荷载人数</th>
               <th className="px-4 py-3">当前状态</th>
               <th className="px-4 py-3">供应商</th>
-              <th className="px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {vehicles.length > 0 ? vehicles.map(vehicle => (
-              <tr key={vehicle.id} className={cn(
-                'hover:bg-slate-50/50 transition-colors',
-                vehicle.auditStatus === '待审核' && 'bg-amber-50'
-              )}>
+              <tr key={vehicle.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-4 py-3 font-semibold text-slate-900">{vehicle.plateNumber}</td>
                 <td className="px-4 py-3 text-slate-600">{vehicle.type}</td>
                 <td className="px-4 py-3 text-slate-600">{vehicle.brand}</td>
-                <td className="px-4 py-3">
-                  <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[vehicle.auditStatus])}>
-                    {vehicle.auditStatus}
-                  </span>
-                </td>
+                <td className="px-4 py-3 text-slate-600">{vehicle.capacity || '-'}</td>
                 <td className="px-4 py-3">
                   <span className={cn(
                     'px-2 py-1 rounded-full text-xs font-medium',
@@ -428,22 +439,10 @@ const ActivityVehiclesTab: React.FC<{
                   </span>
                 </td>
                 <td className="px-4 py-3 text-slate-600">{vehicle.supplier}</td>
-                <td className="px-4 py-3">
-                  {vehicle.auditStatus === '待审核' && (
-                    <button className="text-brand-600 text-sm font-medium hover:text-brand-700">
-                      审核
-                    </button>
-                  )}
-                  {vehicle.auditStatus !== '待审核' && (
-                    <button className="text-slate-400 text-sm hover:text-slate-600">
-                      取消关联
-                    </button>
-                  )}
-                </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                   暂无关联车辆
                 </td>
               </tr>
@@ -459,23 +458,11 @@ const ActivityVehiclesTab: React.FC<{
 const ActivityDriversTab: React.FC<{
   drivers: Driver[];
   activity: Activity;
-}> = ({ drivers, activity }) => {
-  const auditStatusStyles = {
-    '待审核': 'bg-amber-100 text-amber-700',
-    '审核通过': 'bg-green-100 text-green-700',
-    '审核不通过': 'bg-red-100 text-red-700',
-  };
-
+}> = ({ drivers }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-slate-900">关联司机 ({drivers.length})</h3>
-        {activity.period !== '结束期' && (
-          <button className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-            <UserPlus size={16} />
-            关联司机
-          </button>
-        )}
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -485,26 +472,16 @@ const ActivityDriversTab: React.FC<{
               <th className="px-4 py-3">姓名</th>
               <th className="px-4 py-3">手机号</th>
               <th className="px-4 py-3">驾照类型</th>
-              <th className="px-4 py-3">审核状态</th>
               <th className="px-4 py-3">当前状态</th>
               <th className="px-4 py-3">供应商</th>
-              <th className="px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {drivers.length > 0 ? drivers.map(driver => (
-              <tr key={driver.id} className={cn(
-                'hover:bg-slate-50/50 transition-colors',
-                driver.auditStatus === '待审核' && 'bg-amber-50'
-              )}>
+              <tr key={driver.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-4 py-3 font-semibold text-slate-900">{driver.name}</td>
                 <td className="px-4 py-3 text-slate-600">{driver.phone}</td>
                 <td className="px-4 py-3 text-slate-600">{driver.licenseType}</td>
-                <td className="px-4 py-3">
-                  <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[driver.auditStatus])}>
-                    {driver.auditStatus}
-                  </span>
-                </td>
                 <td className="px-4 py-3">
                   <span className={cn(
                     'px-2 py-1 rounded-full text-xs font-medium',
@@ -515,22 +492,10 @@ const ActivityDriversTab: React.FC<{
                   </span>
                 </td>
                 <td className="px-4 py-3 text-slate-600">{driver.supplier}</td>
-                <td className="px-4 py-3">
-                  {driver.auditStatus === '待审核' && (
-                    <button className="text-brand-600 text-sm font-medium hover:text-brand-700">
-                      审核
-                    </button>
-                  )}
-                  {driver.auditStatus !== '待审核' && (
-                    <button className="text-slate-400 text-sm hover:text-slate-600">
-                      取消关联
-                    </button>
-                  )}
-                </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                   暂无关联司机
                 </td>
               </tr>
@@ -548,7 +513,9 @@ const ActivityTasksTab: React.FC<{
   vehicles: Vehicle[];
   drivers: Driver[];
   activity: Activity;
-}> = ({ tasks, vehicles, drivers, activity }) => {
+  onOpenTaskDetail?: (task: Task) => void;
+  onOpenNewTask?: () => void;
+}> = ({ tasks, vehicles, drivers, activity, onOpenTaskDetail, onOpenNewTask }) => {
   const [filterStatus, setFilterStatus] = useState<string>('');
 
   const filteredTasks = tasks.filter(task => {
@@ -571,7 +538,10 @@ const ActivityTasksTab: React.FC<{
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-slate-900">任务列表 ({tasks.length})</h3>
         {activity.period !== '结束期' && (
-          <button className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+          <button 
+            onClick={() => onOpenNewTask && onOpenNewTask()}
+            className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+          >
             <ClipboardList size={16} />
             新建任务
           </button>
@@ -651,7 +621,10 @@ const ActivityTasksTab: React.FC<{
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
-                      <button className="text-brand-600 text-sm font-medium hover:text-brand-700">
+                      <button 
+                        onClick={() => onOpenTaskDetail && onOpenTaskDetail(task)}
+                        className="text-brand-600 text-sm font-medium hover:text-brand-700"
+                      >
                         详情
                       </button>
                       {activity.period === '执行期' && task.status === '待派发' && task.vehicleId && task.driverId && (
@@ -677,15 +650,18 @@ const ActivityTasksTab: React.FC<{
   );
 };
 
-// 轨迹大屏Tab
+// 关联供应商Tab
 const ActivitySuppliersTab: React.FC<{
-  suppliers: Supplier[];
   allSuppliers: Supplier[];
   activity: Activity;
-}> = ({ suppliers, allSuppliers, activity }) => {
-  const { dispatch } = useApp();
+}> = ({ allSuppliers, activity }) => {
+  const { dispatch, activities, suppliers: contextSuppliers } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
+
+  // 从Context中获取最新的活动数据
+  const currentActivity = activities.find(a => a.id === activity.id) || activity;
+  const suppliers = contextSuppliers.filter(s => (currentActivity.supplierIds || []).includes(s.id));
 
   // 获取可关联的供应商（合作中且未关联）
   const availableSuppliers = allSuppliers.filter(s => 
@@ -768,7 +744,7 @@ const ActivitySuppliersTab: React.FC<{
                     <span className={cn(
                       "px-2 py-0.5 rounded text-xs font-medium",
                       supplier.status === '合作中' ? "bg-green-100 text-green-700" :
-                      supplier.status === '已暂停' ? "bg-yellow-100 text-yellow-700" :
+                      supplier.status === '暂停合作' ? "bg-yellow-100 text-yellow-700" :
                       "bg-red-100 text-red-700"
                     )}>
                       {supplier.status}
@@ -883,6 +859,7 @@ const ActivityTrackTab: React.FC<{
   const { tasks, drivers, vehicles } = useApp();
   const [selectedActivityId, setSelectedActivityId] = useState(activity.id);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   
   // 获取当前活动的执行中任务
   const activeTasks = tasks.filter(t => 
@@ -907,6 +884,21 @@ const ActivityTrackTab: React.FC<{
     const taskEndTime = new Date(`${t.date}T${t.endTime}`);
     return now > taskEndTime;
   }).length;
+
+  // 计算最近待办任务（按开始时间距离当前时间最近）
+  const upcomingTasks = tasks
+    .filter(t => t.driverId && t.status !== '已完成' && t.status !== '已取消' && t.status !== '执行中')
+    .map(t => {
+      const taskDateTime = new Date(`${t.date}T${t.startTime}`);
+      return { task: t, timeDiff: Math.abs(taskDateTime.getTime() - Date.now()) };
+    })
+    .sort((a, b) => a.timeDiff - b.timeDiff)
+    .map(item => item.task);
+
+  // 司机最近待办任务（与该司机相关的）
+  const getDriverUpcomingTasks = (driverId: string) => {
+    return upcomingTasks.filter(t => t.driverId === driverId);
+  };
   
   return (
     <div className="h-full flex flex-col">
@@ -971,37 +963,57 @@ const ActivityTrackTab: React.FC<{
           ) : (
             <div className="absolute inset-0 p-4">
               {/* 模拟地图 */}
-              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-green-50 rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center relative">
-                <div className="text-center">
-                  <Map size={64} className="text-brand-400 mx-auto mb-4" />
-                  <p className="text-slate-600 font-medium">轨迹地图</p>
-                  <p className="text-slate-400 text-sm mt-2">显示 {onlineDrivers.length} 个执行中司机位置</p>
+              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-green-50 rounded-lg border-2 border-dashed border-slate-200 relative">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center opacity-20">
+                    <Map size={96} className="text-blue-400 mx-auto mb-4" />
+                    <p className="text-slate-500 font-semibold text-lg">轨迹地图</p>
+                    <p className="text-slate-400 text-sm mt-2">显示 {onlineDrivers.length} 个执行中司机位置</p>
+                  </div>
                 </div>
                 
                 {/* 模拟司机标记 */}
                 {onlineDrivers.map((item, index) => {
                   const isAbnormal = item.task.endTime && new Date() > new Date(`${item.task.date}T${item.task.endTime}`);
+                  const pos = { 
+                    x: 15 + (index % 4) * 25, 
+                    y: 15 + Math.floor(index / 4) * 25 
+                  };
                   return (
                     <div
                       key={item.driver!.id}
-                      onClick={() => setSelectedDriver(item.driver!)}
-                      className="absolute cursor-pointer transform hover:scale-110 transition-transform"
+                      onClick={() => {
+                        setSelectedDriver(item.driver!);
+                      }}
+                      className="absolute cursor-pointer transform hover:scale-110 transition-all duration-200 z-10 group"
                       style={{
-                        left: `${20 + (index * 15)}%`,
-                        top: `${30 + (index * 10)}%`
+                        left: `${pos.x}%`,
+                        top: `${pos.y}%`,
+                        transform: 'translate(-50%, -50%)'
                       }}
                     >
                       <div className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center shadow-lg",
-                        isAbnormal ? "bg-red-500" : "bg-blue-500"
+                        "w-12 h-12 rounded-full flex items-center justify-center shadow-lg transform transition-transform",
+                        isAbnormal ? "bg-red-500 animate-pulse" : "bg-blue-500",
+                        selectedDriver?.id === item.driver!.id && "ring-4 ring-white ring-offset-2 scale-110"
                       )}>
-                        <Navigation size={20} className="text-white" />
+                        <Navigation size={22} className="text-white" />
                       </div>
-                      <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                        <span className="text-xs font-medium text-slate-700 bg-white px-2 py-1 rounded shadow">
+                      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-full shadow-sm",
+                          selectedDriver?.id === item.driver!.id 
+                            ? "bg-brand-600 text-white" 
+                            : "bg-white text-slate-700"
+                        )}>
                           {item.driver!.name}
                         </span>
                       </div>
+                      
+                      {/* 状态指示 */}
+                      {isAbnormal && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full animate-ping"></div>
+                      )}
                     </div>
                   );
                 })}
@@ -1010,134 +1022,205 @@ const ActivityTrackTab: React.FC<{
           )}
         </div>
         
-        {/* 右侧面板 */}
-        <div className="w-80 bg-white rounded-xl shadow-sm flex flex-col">
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-900">司机列表</h3>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {onlineDrivers.length === 0 ? (
-              <div className="text-center py-8">
-                <Users size={32} className="text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">暂无在线司机</p>
-              </div>
-            ) : (
-              onlineDrivers.map((item) => {
-                const isAbnormal = item.task.endTime && new Date() > new Date(`${item.task.date}T${item.task.endTime}`);
-                return (
-                  <div
-                    key={item.driver!.id}
-                    onClick={() => setSelectedDriver(item.driver!)}
-                    className={cn(
-                      "p-3 rounded-lg cursor-pointer transition-colors",
-                      selectedDriver?.id === item.driver!.id ? "bg-brand-50 border border-brand-200" : "bg-slate-50 hover:bg-slate-100"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-slate-900">{item.driver!.name}</span>
-                      {isAbnormal && (
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">异常</span>
+        {/* 右侧面板 - 包含司机列表和信息卡片 */}
+        <div className="w-96 flex flex-col gap-4">
+          {/* 司机列表 */}
+          <div className="bg-white rounded-xl shadow-sm flex flex-col flex-1 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <Users size={18} className="text-brand-600" />
+                司机列表
+              </h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {onlineDrivers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users size={32} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">暂无在线司机</p>
+                </div>
+              ) : (
+                onlineDrivers.map((item) => {
+                  const isAbnormal = item.task.endTime && new Date() > new Date(`${item.task.date}T${item.task.endTime}`);
+                  return (
+                    <div
+                      key={item.driver!.id}
+                      onClick={() => {
+                        setSelectedDriver(item.driver!);
+                      }}
+                      className={cn(
+                        "p-3 rounded-xl cursor-pointer transition-all duration-200 border",
+                        selectedDriver?.id === item.driver!.id 
+                          ? "bg-brand-50 border-brand-200 shadow-sm" 
+                          : "bg-slate-50 border-transparent hover:bg-slate-100"
                       )}
-                    </div>
-                    <p className="text-xs text-slate-500 mb-1">{item.task.name}</p>
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                      <MapPin size={12} />
-                      <span className="truncate">
-                        {item.task.from}
-                        {item.task.waypoints && item.task.waypoints.length > 0 && (
-                          <span> → {item.task.waypoints.map(w => w.name).join(' → ')}</span>
-                        )}
-                        {' → '}{item.task.to}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* 司机信息卡片 */}
-      {selectedDriver && (
-        <div className="fixed bottom-4 right-4 w-96 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-4 py-3 flex items-center justify-between">
-            <h3 className="font-bold text-white">司机信息</h3>
-            <button 
-              onClick={() => setSelectedDriver(null)}
-              className="text-white/80 hover:text-white"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          
-          <div className="p-4 space-y-4">
-            {(() => {
-              const driverInfo = onlineDrivers.find(d => d.driver?.id === selectedDriver.id);
-              if (!driverInfo) return null;
-              
-              const { driver, vehicle, task } = driverInfo;
-              const isAbnormal = task.endTime && new Date() > new Date(`${task.date}T${task.endTime}`);
-              
-              return (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center">
-                      <User size={24} className="text-brand-600" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{driver.name}</p>
-                      <p className="text-sm text-slate-500">{driver.phone}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs text-slate-500 mb-2">当前任务</p>
-                    <p className="font-medium text-slate-900 mb-1">{task.name}</p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                      <Clock size={12} />
-                      <span>{task.startTime} - {task.endTime}</span>
-                    </div>
-                    <div className="flex items-start gap-2 text-xs text-slate-600">
-                      <MapPin size={12} className="mt-0.5" />
-                      <div className="flex-1">
-                        <p className="font-medium">{task.from}</p>
-                        {task.waypoints && task.waypoints.length > 0 && (
-                          <div className="mt-1 space-y-1">
-                            {task.waypoints.map((waypoint, index) => (
-                              <p key={index} className="text-slate-500">
-                                途经点{index + 1}: {waypoint.name}
-                                {waypoint.time && <span className="ml-1">({waypoint.time})</span>}
-                              </p>
-                            ))}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center",
+                            isAbnormal ? "bg-red-100" : "bg-blue-100"
+                          )}>
+                            <User size={16} className={cn(
+                              isAbnormal ? "text-red-600" : "text-blue-600"
+                            )} />
                           </div>
+                          <span className="font-medium text-slate-900">{item.driver!.name}</span>
+                        </div>
+                        {isAbnormal && (
+                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
+                            异常
+                          </span>
                         )}
-                        <p className="font-medium mt-1">{task.to}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-1 font-medium">{item.task.name}</p>
+                      <div className="flex items-center gap-1 text-xs text-slate-400">
+                        <MapPin size={12} />
+                        <span className="truncate">{item.task.from} → {item.task.to}</span>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-slate-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-brand-600">3</p>
-                      <p className="text-xs text-slate-500">今日任务</p>
-                    </div>
-                    <div className="bg-slate-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-green-600">8</p>
-                      <p className="text-xs text-slate-500">本次活动</p>
-                    </div>
-                  </div>
-                  
-                  <button className="w-full bg-gradient-to-r from-brand-600 to-blue-600 text-white py-2 rounded-lg font-medium text-sm hover:from-brand-700 hover:to-blue-700 transition-all">
-                    查看任务详情
-                  </button>
-                </>
-              );
-            })()}
+                  );
+                })
+              )}
+            </div>
           </div>
+          
+          {/* 司机信息卡片 */}
+          {selectedDriver && (
+            <div className="bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden">
+              {(() => {
+                const driverInfo = onlineDrivers.find(d => d.driver?.id === selectedDriver.id);
+                if (!driverInfo || !driverInfo.driver) return null;
+                
+                const { driver, task } = driverInfo;
+                const driverUpcomingTasks = getDriverUpcomingTasks(driver!.id);
+                const displayTasks = showAllUpcoming ? driverUpcomingTasks : driverUpcomingTasks.slice(0, 2);
+                
+                return (
+                  <>
+                    <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-5 py-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                          <User size={24} className="text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-white">{driver!.name}</h3>
+                          <p className="text-white/70 text-sm">{driver!.phone}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedDriver(null);
+                          setShowAllUpcoming(false);
+                        }}
+                        className="text-white/80 hover:text-white transition-colors"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                    
+                    <div className="p-4 space-y-4">
+                      {/* 当前任务 */}
+                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">当前任务</p>
+                        </div>
+                        <p className="font-bold text-slate-900 mb-2">{task.name}</p>
+                        <div className="flex items-center gap-3 text-sm text-slate-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar size={14} className="text-slate-400" />
+                            <span>{task.date}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock size={14} className="text-slate-400" />
+                            <span>{task.startTime} - {task.endTime}</span>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center gap-1 text-sm text-slate-600">
+                          <MapPin size={14} className="text-brand-500" />
+                          <span>{task.from} → {task.to}</span>
+                        </div>
+                      </div>
+
+                      {/* 最近待办任务 */}
+                      {driverUpcomingTasks.length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                              <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">最近待办任务</p>
+                            </div>
+                            {driverUpcomingTasks.length > 2 && (
+                              <button 
+                                onClick={() => setShowAllUpcoming(!showAllUpcoming)}
+                                className="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors"
+                              >
+                                {showAllUpcoming ? '收起' : `展开更多`}
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            {displayTasks.map((t, idx) => (
+                              <div key={t.id} className="bg-slate-50 rounded-xl p-3 border border-slate-100 hover:border-brand-200 transition-colors">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-5 h-5 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-xs font-bold">
+                                      {idx + 1}
+                                    </span>
+                                    <p className="font-medium text-slate-900">{t.name}</p>
+                                  </div>
+                                  <span className={cn(
+                                    "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                                    t.status === '待派发' ? "bg-amber-100 text-amber-700" :
+                                    t.status === '待接收' ? "bg-blue-100 text-blue-700" :
+                                    t.status === '已接收' ? "bg-green-100 text-green-700" :
+                                    "bg-slate-100 text-slate-600"
+                                  )}>
+                                    {t.status}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-slate-500">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar size={12} />
+                                    {t.date}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock size={12} />
+                                    {t.startTime}
+                                  </span>
+                                </div>
+                                <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                                  <MapPin size={12} />
+                                  <span className="truncate">{t.from} → {t.to}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 统计信息 */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 text-center border border-green-100">
+                          <p className="text-2xl font-bold text-green-600">
+                            {tasks.filter(t => t.driverId === driver!.id && t.status === '已完成').length}
+                          </p>
+                          <p className="text-xs text-green-600 font-medium mt-1">已完成任务</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-3 text-center border border-purple-100">
+                          <p className="text-2xl font-bold text-purple-600">{driverUpcomingTasks.length}</p>
+                          <p className="text-xs text-purple-600 font-medium mt-1">待执行任务</p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

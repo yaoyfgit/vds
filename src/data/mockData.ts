@@ -80,8 +80,8 @@ export const activities: Activity[] = [
     status: '进行中',
     period: '执行期',
     managers: ['调度员-陈某', '调度员-李某'],
-    vehicleIds: ['v-1', 'v-2', 'v-3'],
-    driverIds: ['d-1', 'd-2'],
+    vehicleIds: ['v-1', 'v-2', 'v-3', 'v-7'],
+    driverIds: ['d-1', 'd-2', 'd-6'],
     supplierIds: ['sup-1', 'sup-2']
   },
   {
@@ -109,7 +109,8 @@ export const activities: Activity[] = [
     period: '结束期',
     managers: ['调度员-陈某'],
     vehicleIds: [],
-    driverIds: []
+    driverIds: [],
+    supplierIds: []
   }
 ];
 
@@ -252,6 +253,29 @@ export const vehicles: Vehicle[] = [
       insurance: [],
       other: []
     }
+  },
+  {
+    id: 'v-7',
+    plateNumber: '粤A99999',
+    type: '商务车',
+    brand: '本田艾力绅',
+    capacity: 7,
+    color: '白色',
+    licenseRequired: 'C1',
+    supplier: '安迅租车',
+    supplierId: 'sup-1',
+    contactPhone: '13800138001',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    notes: '空间宽敞，适合商务出行',
+    status: '执行中',
+    auditStatus: '审核通过',
+    activityId: 'act-1',
+    auditMaterials: {
+      vehiclePhotos: ['vehicle/v-7/photo1.jpg', 'vehicle/v-7/photo2.jpg'],
+      inspectionCert: ['vehicle/v-7/inspection.pdf'],
+      insurance: ['vehicle/v-7/insurance.pdf'],
+      other: []
+    }
   }
 ];
 
@@ -365,6 +389,28 @@ export const drivers: Driver[] = [
     auditMaterials: {
       licenseFront: ['driver/d-5/license-front.jpg'],
       licenseBack: [],
+      other: []
+    }
+  },
+  {
+    id: 'd-6',
+    name: '孙师傅',
+    phone: '13899990000',
+    idCardNumber: '440101198208088765',
+    licenseType: 'C1',
+    licenseExpiry: '2030-08-08',
+    availableRanges: [{ from: '2026-06-01', to: '2026-12-31' }],
+    supplier: '安迅租车',
+    supplierId: 'sup-1',
+    activityId: 'act-1',
+    emergencyContact: '孙太太',
+    emergencyPhone: '13911112222',
+    notes: '12年驾龄，熟悉广州周边路线',
+    status: '执行中',
+    auditStatus: '审核通过',
+    auditMaterials: {
+      licenseFront: ['driver/d-6/license-front.jpg'],
+      licenseBack: ['driver/d-6/license-back.jpg'],
       other: []
     }
   }
@@ -492,6 +538,35 @@ export const tasks: Task[] = [
       { status: '待接收', time: new Date(Date.now() - 72000000).toISOString(), operator: '调度员', remark: '任务下发' },
       { status: '已接收', time: new Date(Date.now() - 72000000).toISOString(), operator: '王师傅', remark: '接收任务' },
       { status: '执行中', time: new Date(Date.now() - 3600000).toISOString(), operator: '系统', remark: '司机开始执行' }
+    ]
+  },
+  {
+    id: 't-10',
+    activityId: 'act-1',
+    name: '企业代表接送',
+    type: '商务接待',
+    date: '2026-06-12',
+    startTime: '09:30',
+    endTime: '12:30',
+    from: '广州南站',
+    fromTime: '09:30',
+    to: '琶洲展馆',
+    toTime: '12:30',
+    waypoints: [{ name: '珠江新城', order: 1, time: '10:30' }],
+    reachedLocations: ['广州南站'],
+    passenger: '上海企业代表3人',
+    passengerPhone: '13944445555',
+    passengerCount: 3,
+    description: '接上海企业代表到展馆参观',
+    vehicleId: 'v-7',
+    driverId: 'd-6',
+    fieldDispatcher: '李某',
+    status: '执行中',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 72000000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 54000000).toISOString(), operator: '调度员', remark: '任务下发' },
+      { status: '已接收', time: new Date(Date.now() - 54000000).toISOString(), operator: '孙师傅', remark: '接收任务' },
+      { status: '执行中', time: new Date(Date.now() - 7200000).toISOString(), operator: '系统', remark: '司机开始执行' }
     ]
   },
   {

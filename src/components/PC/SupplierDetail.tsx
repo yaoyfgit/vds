@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Eye,
   Edit2,
-  Filter
+  Filter,
+  Search
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
@@ -24,7 +25,7 @@ interface SupplierDetailProps {
 }
 
 const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) => {
-  const { vehicles, drivers } = useApp();
+  const { vehicles, drivers, activities, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState<'info' | 'vehicles' | 'drivers'>('info');
 
   // 获取该供应商名下的车辆和司机
@@ -84,7 +85,10 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2">
+            <button 
+              onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'EDIT_SUPPLIER', data: supplier } })}
+              className="text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2"
+            >
               <Edit2 size={16} />
               编辑
             </button>
@@ -117,7 +121,7 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
             )}
           >
             <Car size={16} />
-            明细车辆
+            名下车辆
             {supplierVehicles.length > 0 && (
               <span className="bg-brand-100 text-brand-600 px-2 py-0.5 rounded-full text-xs">
                 {supplierVehicles.length}
@@ -198,6 +202,54 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
                   )}
                 </div>
               </div>
+
+              {/* 附件展示 */}
+              {supplier.attachments && ((supplier.attachments.contractFiles?.length || 0) + (supplier.attachments.qualificationFiles?.length || 0) + (supplier.attachments.otherFiles?.length || 0)) > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <FileText size={18} />
+                    附件
+                  </h3>
+                  <div className="space-y-4">
+                    {supplier.attachments.contractFiles?.length && supplier.attachments.contractFiles.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-500 mb-2">合同文件</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {supplier.attachments.contractFiles.map((_, index) => (
+                            <div key={index} className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity">
+                              <FileText size={24} className="text-slate-400" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {supplier.attachments.qualificationFiles?.length && supplier.attachments.qualificationFiles.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-500 mb-2">资质文件</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {supplier.attachments.qualificationFiles.map((_, index) => (
+                            <div key={index} className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity">
+                              <FileText size={24} className="text-slate-400" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {supplier.attachments.otherFiles?.length && supplier.attachments.otherFiles.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-500 mb-2">其他文件</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {supplier.attachments.otherFiles.map((_, index) => (
+                            <div key={index} className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity">
+                              <FileText size={24} className="text-slate-400" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* 资源统计 */}
               <div>
@@ -281,17 +333,23 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
                         <th className="px-4 py-3">车牌号</th>
                         <th className="px-4 py-3">类型</th>
                         <th className="px-4 py-3">品牌</th>
+                        <th className="px-4 py-3">核载人数</th>
+                        <th className="px-4 py-3">所属活动</th>
                         <th className="px-4 py-3">审核状态</th>
                         <th className="px-4 py-3">当前状态</th>
                         <th className="px-4 py-3">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {supplierVehicles.map(vehicle => (
+                      {supplierVehicles.map(vehicle => {
+                        const vehicleActivity = activities.find(a => a.id === vehicle.activityId);
+                        return (
                         <tr key={vehicle.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 font-semibold text-slate-900">{vehicle.plateNumber}</td>
                           <td className="px-4 py-3 text-slate-600">{vehicle.type}</td>
                           <td className="px-4 py-3 text-slate-600">{vehicle.brand || '-'}</td>
+                          <td className="px-4 py-3 text-slate-600">{vehicle.capacity || '-'}</td>
+                          <td className="px-4 py-3 text-slate-600">{vehicleActivity?.name || '-'}</td>
                           <td className="px-4 py-3">
                             <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[vehicle.auditStatus])}>
                               {vehicle.auditStatus}
@@ -303,13 +361,17 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <button className="text-brand-600 text-sm font-medium flex items-center gap-1">
+                            <button 
+                              onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'VEHICLE_DETAIL', data: vehicle } })}
+                              className="text-brand-600 text-sm font-medium flex items-center gap-1"
+                            >
                               <Eye size={14} />
                               详情
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -333,17 +395,21 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
                         <th className="px-4 py-3">姓名</th>
                         <th className="px-4 py-3">手机号</th>
                         <th className="px-4 py-3">驾照类型</th>
+                        <th className="px-4 py-3">所属活动</th>
                         <th className="px-4 py-3">审核状态</th>
                         <th className="px-4 py-3">当前状态</th>
                         <th className="px-4 py-3">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {supplierDrivers.map(driver => (
+                      {supplierDrivers.map(driver => {
+                        const driverActivity = activities.find(a => a.id === driver.activityId);
+                        return (
                         <tr key={driver.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 font-semibold text-slate-900">{driver.name}</td>
                           <td className="px-4 py-3 text-slate-600">{driver.phone}</td>
                           <td className="px-4 py-3 text-slate-600">{driver.licenseType}</td>
+                          <td className="px-4 py-3 text-slate-600">{driverActivity?.name || '-'}</td>
                           <td className="px-4 py-3">
                             <span className={cn('px-2 py-1 rounded-full text-xs font-medium', auditStatusStyles[driver.auditStatus])}>
                               {driver.auditStatus}
@@ -355,13 +421,17 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <button className="text-brand-600 text-sm font-medium flex items-center gap-1">
+                            <button 
+                              onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'DRIVER_DETAIL', data: driver } })}
+                              className="text-brand-600 text-sm font-medium flex items-center gap-1"
+                            >
                               <Eye size={14} />
                               详情
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -385,10 +455,12 @@ export const SuppliersView: React.FC = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [filterType, setFilterType] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const [nameFilter, setNameFilter] = useState<string>('');
 
   const filteredSuppliers = suppliers.filter(supplier => {
     if (filterType && supplier.type !== filterType) return false;
     if (filterStatus && supplier.status !== filterStatus) return false;
+    if (nameFilter && !supplier.name.toLowerCase().includes(nameFilter.toLowerCase())) return false;
     return true;
   });
 
@@ -411,6 +483,16 @@ export const SuppliersView: React.FC = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">供应商管理</h2>
           <div className="flex gap-2">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                className="pl-8 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-brand-500 outline-none"
+                placeholder="搜索供应商名称"
+              />
+            </div>
             <div className="relative">
               <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <select
