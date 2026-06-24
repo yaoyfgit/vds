@@ -8,7 +8,9 @@ import {
   XCircle,
   Download,
   AlertCircle,
-  CreditCard
+  CreditCard,
+  Car,
+  Link2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
@@ -20,13 +22,14 @@ interface DriverDetailProps {
 }
 
 const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
-  const { activities, drivers, dispatch } = useApp();
+  const { activities, drivers, vehicles, dispatch } = useApp();
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditAction, setAuditAction] = useState<'approve' | 'reject'>('approve');
   const [auditRemark, setAuditRemark] = useState('');
 
   const currentDriver = drivers.find((d: Driver) => d.id === driver.id) || driver;
   const activity = activities.find(a => a.id === currentDriver.activityId);
+  const boundVehicle = vehicles.find(v => v.id === currentDriver.vehicleId);
   const statusStyles = {
     '可调配': 'bg-green-100 text-green-700',
     '已调度': 'bg-blue-100 text-blue-700',
@@ -169,6 +172,27 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               </div>
             </div>
 
+            {/* 绑定车辆 */}
+            {boundVehicle && (
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <Link2 size={18} />
+                  绑定车辆
+                </h3>
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Car size={18} className="text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-900">{boundVehicle.plateNumber}</h4>
+                      <p className="text-sm text-slate-500">{boundVehicle.type} | {boundVehicle.brand} | {boundVehicle.capacity}座</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 审核材料 */}
             <div>
               <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -177,9 +201,12 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               </h3>
               
               {/* 驾驶证正本 */}
-              {currentDriver.auditMaterials.licenseFront.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">驾驶证正本</h4>
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-slate-700">驾驶证正本</h4>
+                  <span className="text-xs text-slate-400">必填 · JPG/PNG · ≤10MB</span>
+                </div>
+                {currentDriver.auditMaterials.licenseFront.length > 0 ? (
                   <div className="flex gap-2 flex-wrap">
                     {currentDriver.auditMaterials.licenseFront.map((_, index) => (
                       <div
@@ -190,13 +217,18 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-sm text-slate-400">未上传</div>
+                )}
+              </div>
 
               {/* 驾驶证副本 */}
-              {currentDriver.auditMaterials.licenseBack.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">驾驶证副本</h4>
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-slate-700">驾驶证副本</h4>
+                  <span className="text-xs text-slate-400">必填 · JPG/PNG · ≤10MB</span>
+                </div>
+                {currentDriver.auditMaterials.licenseBack.length > 0 ? (
                   <div className="flex gap-2 flex-wrap">
                     {currentDriver.auditMaterials.licenseBack.map((_, index) => (
                       <div
@@ -207,27 +239,56 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-sm text-slate-400">未上传</div>
+                )}
+              </div>
 
-              {/* 其他材料 */}
-              {currentDriver.auditMaterials.other.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">其他材料</h4>
+              {/* 照片 */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-slate-700">照片</h4>
+                  <span className="text-xs text-slate-400">可选 · JPG/PNG · 最多5张 · 单张≤10MB</span>
+                </div>
+                {currentDriver.auditMaterials.photos.length > 0 ? (
+                  <div className="flex gap-2 flex-wrap">
+                    {currentDriver.auditMaterials.photos.map((_, index) => (
+                      <div
+                        key={index}
+                        className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <Image size={24} className="text-slate-400" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-400">未上传</div>
+                )}
+              </div>
+
+              {/* 其他资质 */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-slate-700">其他资质材料</h4>
+                  <span className="text-xs text-slate-400">可选 · JPG/PNG/PDF · 最多5份 · 单份≤10MB</span>
+                </div>
+                {currentDriver.auditMaterials.otherQualifications.length > 0 ? (
                   <div className="flex gap-2">
-                    {currentDriver.auditMaterials.other.map((_, index) => (
+                    {currentDriver.auditMaterials.otherQualifications.map((_, index) => (
                       <button
                         key={index}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
                       >
                         <FileText size={16} className="text-purple-500" />
-                        <span className="text-sm text-slate-700">其他材料{index + 1}.pdf</span>
+                        <span className="text-sm text-slate-700">其他资质{index + 1}.pdf</span>
                         <Download size={14} className="text-slate-400" />
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-sm text-slate-400">未上传</div>
+                )}
+              </div>
 
               {/* 材料缺失提示 */}
               {(currentDriver.auditMaterials.licenseFront.length === 0 || 

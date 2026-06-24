@@ -1,4 +1,38 @@
-import type { Activity, Vehicle, Driver, Task, Supplier, AuditRecord } from '../types';
+import type { Activity, Vehicle, Driver, Task, Supplier, AuditRecord, WorkGroup } from '../types';
+
+export const workGroups: WorkGroup[] = [
+  {
+    id: 'wg-1',
+    activityId: 'act-1',
+    location: '市政务中心',
+    fieldManager: '张主任',
+    fieldManagerPhone: '13811112222',
+    fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
+    pendingTaskCount: 2,
+    createdAt: '2026-06-01'
+  },
+  {
+    id: 'wg-2',
+    activityId: 'act-1',
+    location: '东方酒店',
+    fieldDispatcher: '李某',
+    fieldDispatcherPhone: '13900139002',
+    pendingTaskCount: 1,
+    createdAt: '2026-06-02'
+  },
+  {
+    id: 'wg-3',
+    activityId: 'act-2',
+    location: '深圳会展中心',
+    fieldManager: '王经理',
+    fieldManagerPhone: '13822223333',
+    fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
+    pendingTaskCount: 0,
+    createdAt: '2026-06-15'
+  }
+];
 
 export const suppliers: Supplier[] = [
   {
@@ -82,7 +116,8 @@ export const activities: Activity[] = [
     managers: ['调度员-陈某', '调度员-李某'],
     vehicleIds: ['v-1', 'v-2', 'v-3', 'v-7'],
     driverIds: ['d-1', 'd-2', 'd-6'],
-    supplierIds: ['sup-1', 'sup-2']
+    supplierIds: ['sup-1', 'sup-2'],
+    workGroupIds: ['wg-1', 'wg-2']
   },
   {
     id: 'act-2',
@@ -96,7 +131,8 @@ export const activities: Activity[] = [
     managers: ['调度员-陈某'],
     vehicleIds: ['v-1', 'v-4'],
     driverIds: ['d-1', 'd-2'],
-    supplierIds: ['sup-1']
+    supplierIds: ['sup-1'],
+    workGroupIds: ['wg-3']
   },
   {
     id: 'act-3',
@@ -110,7 +146,8 @@ export const activities: Activity[] = [
     managers: ['调度员-陈某'],
     vehicleIds: [],
     driverIds: [],
-    supplierIds: []
+    supplierIds: [],
+    workGroupIds: []
   }
 ];
 
@@ -131,6 +168,8 @@ export const vehicles: Vehicle[] = [
     status: '可调配',
     auditStatus: '审核通过',
     activityId: 'act-1',
+    defaultDriverId: 'd-1',
+    activityLocations: ['市政务中心', '东方酒店'],
     auditMaterials: {
       vehiclePhotos: ['vehicle/v-1/photo1.jpg', 'vehicle/v-1/photo2.jpg'],
       inspectionCert: ['vehicle/v-1/inspection.pdf'],
@@ -154,6 +193,8 @@ export const vehicles: Vehicle[] = [
     status: '执行中',
     auditStatus: '审核通过',
     activityId: 'act-1',
+    defaultDriverId: 'd-2',
+    activityLocations: ['市政务中心'],
     auditMaterials: {
       vehiclePhotos: ['vehicle/v-2/photo1.jpg'],
       inspectionCert: ['vehicle/v-2/inspection.pdf'],
@@ -177,6 +218,7 @@ export const vehicles: Vehicle[] = [
     status: '可调配',
     auditStatus: '审核通过',
     activityId: 'act-2',
+    activityLocations: ['深圳会展中心'],
     auditMaterials: {
       vehiclePhotos: ['vehicle/v-3/photo1.jpg', 'vehicle/v-3/photo2.jpg', 'vehicle/v-3/photo3.jpg'],
       inspectionCert: ['vehicle/v-3/inspection.pdf'],
@@ -200,6 +242,7 @@ export const vehicles: Vehicle[] = [
     status: '可调配',
     auditStatus: '待审核',
     activityId: 'act-1',
+    activityLocations: [],
     auditMaterials: {
       vehiclePhotos: ['vehicle/v-4/photo1.jpg'],
       inspectionCert: ['vehicle/v-4/inspection.pdf'],
@@ -224,6 +267,7 @@ export const vehicles: Vehicle[] = [
     auditStatus: '审核通过',
     unavailableReason: '维修保养中',
     activityId: 'act-3',
+    activityLocations: [],
     auditMaterials: {
       vehiclePhotos: ['vehicle/v-5/photo1.jpg', 'vehicle/v-5/photo2.jpg'],
       inspectionCert: ['vehicle/v-5/inspection.pdf'],
@@ -247,6 +291,7 @@ export const vehicles: Vehicle[] = [
     status: '可调配',
     auditStatus: '审核不通过',
     auditRemark: '保险过期，需重新提交',
+    activityLocations: [],
     auditMaterials: {
       vehiclePhotos: ['vehicle/v-6/photo1.jpg'],
       inspectionCert: ['vehicle/v-6/inspection.pdf'],
@@ -270,6 +315,8 @@ export const vehicles: Vehicle[] = [
     status: '执行中',
     auditStatus: '审核通过',
     activityId: 'act-1',
+    defaultDriverId: 'd-6',
+    activityLocations: ['东方酒店'],
     auditMaterials: {
       vehiclePhotos: ['vehicle/v-7/photo1.jpg', 'vehicle/v-7/photo2.jpg'],
       inspectionCert: ['vehicle/v-7/inspection.pdf'],
@@ -296,10 +343,12 @@ export const drivers: Driver[] = [
     notes: '10年驾龄，熟悉广州市区路线',
     status: '可调配',
     auditStatus: '审核通过',
+    privacyAgreementAccepted: true,
     auditMaterials: {
       licenseFront: ['driver/d-1/license-front.jpg'],
       licenseBack: ['driver/d-1/license-back.jpg'],
-      other: []
+      photos: ['driver/d-1/photo.jpg'],
+      otherQualifications: []
     }
   },
   {
@@ -318,10 +367,12 @@ export const drivers: Driver[] = [
     notes: '15年驾龄，可驾驶中巴车',
     status: '执行中',
     auditStatus: '审核通过',
+    privacyAgreementAccepted: true,
     auditMaterials: {
       licenseFront: ['driver/d-2/license-front.jpg'],
       licenseBack: ['driver/d-2/license-back.jpg'],
-      other: []
+      photos: ['driver/d-2/photo.jpg'],
+      otherQualifications: []
     }
   },
   {
@@ -342,10 +393,12 @@ export const drivers: Driver[] = [
     auditStatus: '审核通过',
     unavailableReason: '请假中',
     expectedReturnDate: '2026-06-15',
+    privacyAgreementAccepted: true,
     auditMaterials: {
       licenseFront: ['driver/d-3/license-front.jpg'],
       licenseBack: ['driver/d-3/license-back.jpg'],
-      other: []
+      photos: ['driver/d-3/photo.jpg'],
+      otherQualifications: []
     }
   },
   {
@@ -364,10 +417,12 @@ export const drivers: Driver[] = [
     notes: '8年驾龄，自动挡专业司机',
     status: '可调配',
     auditStatus: '待审核',
+    privacyAgreementAccepted: false,
     auditMaterials: {
       licenseFront: ['driver/d-4/license-front.jpg'],
       licenseBack: ['driver/d-4/license-back.jpg'],
-      other: ['driver/d-4/other.pdf']
+      photos: [],
+      otherQualifications: ['driver/d-4/certificate.pdf']
     }
   },
   {
@@ -386,10 +441,12 @@ export const drivers: Driver[] = [
     status: '可调配',
     auditStatus: '审核不通过',
     auditRemark: '驾驶证照片不清晰，请重新上传',
+    privacyAgreementAccepted: false,
     auditMaterials: {
       licenseFront: ['driver/d-5/license-front.jpg'],
       licenseBack: [],
-      other: []
+      photos: [],
+      otherQualifications: []
     }
   },
   {
@@ -408,10 +465,12 @@ export const drivers: Driver[] = [
     notes: '12年驾龄，熟悉广州周边路线',
     status: '执行中',
     auditStatus: '审核通过',
+    privacyAgreementAccepted: true,
     auditMaterials: {
       licenseFront: ['driver/d-6/license-front.jpg'],
       licenseBack: ['driver/d-6/license-back.jpg'],
-      other: []
+      photos: ['driver/d-6/photo.jpg'],
+      otherQualifications: []
     }
   }
 ];
@@ -532,6 +591,7 @@ export const tasks: Task[] = [
     vehicleId: 'v-2',
     driverId: 'd-2',
     fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
     status: '执行中',
     history: [
       { status: '待派发', time: new Date(Date.now() - 86400000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -561,6 +621,7 @@ export const tasks: Task[] = [
     vehicleId: 'v-7',
     driverId: 'd-6',
     fieldDispatcher: '李某',
+    fieldDispatcherPhone: '13900139002',
     status: '执行中',
     history: [
       { status: '待派发', time: new Date(Date.now() - 72000000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -588,6 +649,7 @@ export const tasks: Task[] = [
     vehicleId: 'v-1',
     driverId: 'd-1',
     fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
     status: '待接收',
     history: [
       { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -613,6 +675,7 @@ export const tasks: Task[] = [
     vehicleId: 'v-2',
     driverId: 'd-2',
     fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
     status: '已接收',
     history: [
       { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -637,6 +700,7 @@ export const tasks: Task[] = [
     vehicleId: 'v-3',
     driverId: 'd-4',
     fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
     status: '待派发',
     history: [
       { status: '待派发', time: new Date(Date.now() - 3600000).toISOString(), operator: '调度员', remark: '创建任务' }
@@ -661,6 +725,7 @@ export const tasks: Task[] = [
     vehicleId: 'v-3',
     driverId: 'd-1',
     fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
     status: '已完成',
     history: [
       { status: '待派发', time: new Date(Date.now() - 172800000).toISOString(), operator: '调度员', remark: '创建任务' },
@@ -689,6 +754,7 @@ export const tasks: Task[] = [
     vehicleId: 'v-1',
     driverId: 'd-1',
     fieldDispatcher: '陈某',
+    fieldDispatcherPhone: '13900139001',
     status: '已拒绝',
     rejectReason: '车辆故障，无法执行',
     history: [
@@ -737,7 +803,10 @@ export const tasks: Task[] = [
     description: '送专家团队返程',
     vehicleId: 'v-3',
     driverId: 'd-1',
+    fieldDispatcher: '李某',
+    fieldDispatcherPhone: '13900139002',
     status: '待接收',
+    lastRemindTime: new Date(Date.now() - 300000).toISOString(),
     history: [
       { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
       { status: '待接收', time: new Date(Date.now() - 36000000).toISOString(), operator: '调度员', remark: '任务下发' }
@@ -757,9 +826,9 @@ export const tasks: Task[] = [
     passengerPhone: '13922223333',
     passengerCount: 8,
     description: '接待外地考察团',
-    status: '待派发',
+    status: '待审批',
     history: [
-      { status: '待派发', time: new Date(Date.now() - 10800000).toISOString(), operator: '调度员', remark: '创建任务' }
+      { status: '待审批', time: new Date(Date.now() - 10800000).toISOString(), operator: '调度员', remark: '创建任务' }
     ]
   },
   {
@@ -780,6 +849,31 @@ export const tasks: Task[] = [
     status: '待派发',
     history: [
       { status: '待派发', time: new Date(Date.now() - 7200000).toISOString(), operator: '调度员', remark: '创建任务' }
+    ]
+  },
+  {
+    id: 't-11',
+    activityId: 'act-1',
+    name: '物资运输',
+    type: '物资运输',
+    date: '2026-06-12',
+    startTime: '14:00',
+    endTime: '16:00',
+    from: '仓库',
+    to: '会场',
+    description: '运输会议物资',
+    vehicleId: 'v-7',
+    driverId: 'd-6',
+    fieldDispatcher: '李某',
+    fieldDispatcherPhone: '13900139002',
+    status: '已暂停',
+    suspendReason: '车辆加油中',
+    history: [
+      { status: '待派发', time: new Date(Date.now() - 43200000).toISOString(), operator: '调度员', remark: '创建任务' },
+      { status: '待接收', time: new Date(Date.now() - 36000000).toISOString(), operator: '调度员', remark: '任务下发' },
+      { status: '已接收', time: new Date(Date.now() - 36000000).toISOString(), operator: '孙师傅', remark: '接收任务' },
+      { status: '执行中', time: new Date(Date.now() - 28800000).toISOString(), operator: '系统', remark: '司机开始执行' },
+      { status: '已暂停', time: new Date(Date.now() - 7200000).toISOString(), operator: '孙师傅', remark: '车辆加油中' }
     ]
   }
 ];

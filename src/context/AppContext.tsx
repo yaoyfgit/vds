@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Activity, Vehicle, Driver, Task, TaskStatus, Supplier, AuditRecord } from '../types';
-import { activities, vehicles, drivers, tasks, suppliers, auditRecords } from '../data/mockData';
+import { Activity, Vehicle, Driver, Task, TaskStatus, Supplier, AuditRecord, WorkGroup } from '../types';
+import { activities, vehicles, drivers, tasks, suppliers, auditRecords, workGroups } from '../data/mockData';
 
 interface AppState {
   activities: Activity[];
@@ -9,6 +9,7 @@ interface AppState {
   tasks: Task[];
   suppliers: Supplier[];
   auditRecords: AuditRecord[];
+  workGroups: WorkGroup[];
   activeModal: string | null;
   modalData: any;
   currentUser: {
@@ -26,6 +27,7 @@ const initialState: AppState = {
   tasks: tasks,
   suppliers: suppliers,
   auditRecords: auditRecords,
+  workGroups: workGroups,
   activeModal: null,
   modalData: null,
   currentUser: {
@@ -46,18 +48,29 @@ type Action =
   | { type: 'ASSIGN_RESOURCE_TO_TASK'; payload: { taskId: string; vehicleId?: string; driverId?: string } }
   | { type: 'REASSIGN_TASK'; payload: { taskId: string; vehicleId?: string; driverId?: string; remark?: string } }
   | { type: 'CANCEL_TASK'; payload: { id: string; reason: string } }
+  | { type: 'REMIND_TASK'; payload: { id: string } }
+  | { type: 'SUSPEND_TASK'; payload: { id: string; reason: string } }
+  | { type: 'RESUME_TASK'; payload: { id: string } }
+  | { type: 'REPORT_FAULT'; payload: { id: string; reason: string } }
   | { type: 'ADD_VEHICLE'; payload: Vehicle }
   | { type: 'UPDATE_VEHICLE'; payload: { id: string; data: Partial<Vehicle> } }
   | { type: 'DELETE_VEHICLE'; payload: { id: string } }
   | { type: 'SET_VEHICLE_UNAVAILABLE'; payload: { id: string; reason: string } }
   | { type: 'SET_VEHICLE_AVAILABLE'; payload: { id: string } }
+  | { type: 'BIND_DEFAULT_DRIVER'; payload: { vehicleId: string; driverId: string } }
+  | { type: 'UNBIND_DEFAULT_DRIVER'; payload: { vehicleId: string } }
+  | { type: 'BIND_ACTIVITY_LOCATION'; payload: { vehicleId: string; locations: string[] } }
   | { type: 'ADD_DRIVER'; payload: Driver }
   | { type: 'UPDATE_DRIVER'; payload: { id: string; data: Partial<Driver> } }
   | { type: 'DELETE_DRIVER'; payload: { id: string } }
   | { type: 'SET_DRIVER_UNAVAILABLE'; payload: { id: string; reason: string; expectedReturnDate?: string } }
   | { type: 'SET_DRIVER_AVAILABLE'; payload: { id: string } }
+  | { type: 'ACCEPT_PRIVACY_AGREEMENT'; payload: { driverId: string } }
   | { type: 'ADD_SUPPLIER'; payload: Supplier }
   | { type: 'UPDATE_SUPPLIER'; payload: { id: string; data: Partial<Supplier> } }
+  | { type: 'ADD_WORK_GROUP'; payload: WorkGroup }
+  | { type: 'UPDATE_WORK_GROUP'; payload: { id: string; data: Partial<WorkGroup> } }
+  | { type: 'DELETE_WORK_GROUP'; payload: { id: string } }
   | { type: 'ASSIGN_VEHICLE_TO_ACTIVITY'; payload: { activityId: string; vehicleId: string } }
   | { type: 'ASSIGN_DRIVER_TO_ACTIVITY'; payload: { activityId: string; driverId: string } }
   | { type: 'REMOVE_VEHICLE_FROM_ACTIVITY'; payload: { activityId: string; vehicleId: string } }
@@ -107,17 +120,14 @@ const reducer = (state: AppState, action: Action): AppState => {
       
       const updatedTask = { ...taskToUpdate, status: action.payload.status, history: newHistory };
       
-      // 如果是拒绝任务，保存拒绝原因
       if (action.payload.status === '已拒绝' && action.payload.reason) {
         updatedTask.rejectReason = action.payload.reason;
       }
       
-      // 如果任务完成，保存备注并释放资源
       if (action.payload.status === '已完成' && action.payload.reason) {
         updatedTask.remark = action.payload.reason;
       }
       
-      // 如果任务完成或拒绝，释放车辆和司机资源
       const shouldReleaseResources = ['已完成', '已拒绝', '已取消'].includes(action.payload.status);
       
       return {
@@ -262,6 +272,97 @@ const reducer = (state: AppState, action: Action): AppState => {
           return driver;
         }),
       };
+    case 'REMIND_TASK':
+      return {
+        ...state,
+        tasks: state.tasks.map(task => {
+          if (task.id === action.payload.id) {
+            const newHistory = [
+              ...(task.history || []),
+              {
+                status: task.status,
+                time: new Date().toISOString(),
+                operator: '调度员',
+                remark: '提醒接收'
+              }
+            ];
+            return { ...task, lastRemindTime: new Date().toISOString(), history: newHistory };
+          }
+          return task;
+        }),
+      };
+    case 'SUSPEND_TASK':
+      const suspendTask = state.tasks.find(t => t.id === action.payload.id);
+      if (!suspendTask) return state;
+      
+      return {
+        ...state,
+        tasks: state.tasks.map(task => {
+          if (task.id === action.payload.id) {
+            const newHistory = [
+              ...(task.history || []),
+              {
+                status: '已暂停' as TaskStatus,
+                time: new Date().toISOString(),
+                operator: '司机',
+                remark: action.payload.reason
+              }
+            ];
+            return { ...task, status: '已暂停', suspendReason: action.payload.reason, history: newHistory };
+          }
+          return task;
+        }),
+      };
+    case 'RESUME_TASK':
+      const resumeTask = state.tasks.find(t => t.id === action.payload.id);
+      if (!resumeTask) return state;
+      
+      return {
+        ...state,
+        tasks: state.tasks.map(task => {
+          if (task.id === action.payload.id) {
+            const newHistory = [
+              ...(task.history || []),
+              {
+                status: '执行中' as TaskStatus,
+                time: new Date().toISOString(),
+                operator: '司机',
+                remark: '继续执行'
+              }
+            ];
+            return { ...task, status: '执行中', history: newHistory };
+          }
+          return task;
+        }),
+      };
+    case 'REPORT_FAULT':
+      const faultTask = state.tasks.find(t => t.id === action.payload.id);
+      if (!faultTask) return state;
+      
+      return {
+        ...state,
+        tasks: state.tasks.map(task => {
+          if (task.id === action.payload.id) {
+            const newHistory = [
+              ...(task.history || []),
+              {
+                status: '已暂停' as TaskStatus,
+                time: new Date().toISOString(),
+                operator: '司机',
+                remark: '故障上报：' + action.payload.reason
+              }
+            ];
+            return { ...task, status: '已暂停', suspendReason: action.payload.reason, history: newHistory };
+          }
+          return task;
+        }),
+        vehicles: state.vehicles.map(vehicle => {
+          if (vehicle.id === faultTask.vehicleId) {
+            return { ...vehicle, status: '不可用', unavailableReason: '故障' };
+          }
+          return vehicle;
+        }),
+      };
     case 'ADD_VEHICLE':
       return { ...state, vehicles: [...state.vehicles, action.payload] };
     case 'UPDATE_VEHICLE':
@@ -291,6 +392,33 @@ const reducer = (state: AppState, action: Action): AppState => {
         vehicles: state.vehicles.map(vehicle =>
           vehicle.id === action.payload.id 
             ? { ...vehicle, status: '可调配', unavailableReason: undefined }
+            : vehicle
+        ),
+      };
+    case 'BIND_DEFAULT_DRIVER':
+      return {
+        ...state,
+        vehicles: state.vehicles.map(vehicle =>
+          vehicle.id === action.payload.vehicleId
+            ? { ...vehicle, defaultDriverId: action.payload.driverId }
+            : vehicle
+        ),
+      };
+    case 'UNBIND_DEFAULT_DRIVER':
+      return {
+        ...state,
+        vehicles: state.vehicles.map(vehicle =>
+          vehicle.id === action.payload.vehicleId
+            ? { ...vehicle, defaultDriverId: undefined }
+            : vehicle
+        ),
+      };
+    case 'BIND_ACTIVITY_LOCATION':
+      return {
+        ...state,
+        vehicles: state.vehicles.map(vehicle =>
+          vehicle.id === action.payload.vehicleId
+            ? { ...vehicle, activityLocations: action.payload.locations }
             : vehicle
         ),
       };
@@ -336,6 +464,15 @@ const reducer = (state: AppState, action: Action): AppState => {
             : driver
         ),
       };
+    case 'ACCEPT_PRIVACY_AGREEMENT':
+      return {
+        ...state,
+        drivers: state.drivers.map(driver =>
+          driver.id === action.payload.driverId
+            ? { ...driver, privacyAgreementAccepted: true }
+            : driver
+        ),
+      };
     case 'ADD_SUPPLIER':
       return { ...state, suppliers: [...state.suppliers, action.payload] };
     case 'UPDATE_SUPPLIER':
@@ -344,6 +481,20 @@ const reducer = (state: AppState, action: Action): AppState => {
         suppliers: state.suppliers.map(supplier =>
           supplier.id === action.payload.id ? { ...supplier, ...action.payload.data } : supplier
         ),
+      };
+    case 'ADD_WORK_GROUP':
+      return { ...state, workGroups: [...state.workGroups, action.payload] };
+    case 'UPDATE_WORK_GROUP':
+      return {
+        ...state,
+        workGroups: state.workGroups.map(wg =>
+          wg.id === action.payload.id ? { ...wg, ...action.payload.data } : wg
+        ),
+      };
+    case 'DELETE_WORK_GROUP':
+      return {
+        ...state,
+        workGroups: state.workGroups.filter(wg => wg.id !== action.payload.id)
       };
     case 'ASSIGN_VEHICLE_TO_ACTIVITY':
       return {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { 
   Car, 
   Users, 
+  Route,
   Plus, 
   Edit2, 
   Trash2, 
@@ -21,6 +22,7 @@ import {
   X,
   Image,
   FileText,
+  CreditCard,
 } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
 import PCLayout from './components/PC/PCLayout';
@@ -78,8 +80,9 @@ function PCApp() {
   const [inspectionCerts, setInspectionCerts] = useState<string[]>([]);
   const [insuranceDocs, setInsuranceDocs] = useState<string[]>([]);
   const [otherMaterials, setOtherMaterials] = useState<string[]>([]);
+  const [driverLicenseFront, setDriverLicenseFront] = useState<string[]>([]);
+  const [driverLicenseBack, setDriverLicenseBack] = useState<string[]>([]);
   const [driverPhotos, setDriverPhotos] = useState<string[]>([]);
-  const [driverLicense, setDriverLicense] = useState<string[]>([]);
   const [driverOtherMaterials, setDriverOtherMaterials] = useState<string[]>([]);
   const [cancelReason, setCancelReason] = useState('');
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
@@ -87,6 +90,8 @@ function PCApp() {
   const [contractFiles, setContractFiles] = useState<string[]>([]);
   const [qualificationFiles, setQualificationFiles] = useState<string[]>([]);
   const [otherSupplierFiles, setOtherSupplierFiles] = useState<string[]>([]);
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string>('');
+  const [vehicleCapacityFilter, setVehicleCapacityFilter] = useState<string>('');
 
   const handleClose = () => {
     dispatch({ type: 'CLOSE_MODAL' });
@@ -99,14 +104,17 @@ function PCApp() {
     setInspectionCerts([]);
     setInsuranceDocs([]);
     setOtherMaterials([]);
+    setDriverLicenseFront([]);
+    setDriverLicenseBack([]);
     setDriverPhotos([]);
-    setDriverLicense([]);
     setDriverOtherMaterials([]);
     setContractFiles([]);
     setQualificationFiles([]);
     setOtherSupplierFiles([]);
     setCancelReason('');
     setSelectedActivityId('');
+    setVehicleTypeFilter('');
+    setVehicleCapacityFilter('');
   };
 
   const checkTimeConflicts = (vehicleId: string | undefined, driverId: string | undefined, taskDate: string, startTime: string, endTime: string, excludeTaskId?: string) => {
@@ -204,7 +212,8 @@ function PCApp() {
         managers: ['调度员-陈某'],
         vehicleIds: selectedVehicles,
         driverIds: selectedDrivers,
-        supplierIds: []
+        supplierIds: [],
+        workGroupIds: []
       };
       dispatch({ type: 'ADD_ACTIVITY', payload: newActivity });
       handleClose();
@@ -229,6 +238,7 @@ function PCApp() {
         availableRanges: vehicleAvailableRanges,
         notes: formData.notes,
         activityId: selectedActivityId || undefined,
+        activityLocations: [],
         status: '可调配' as ResourceStatus,
         auditStatus: '待审核' as AuditStatus,
         auditMaterials: {
@@ -275,10 +285,12 @@ function PCApp() {
         activityId: selectedActivityId || undefined,
         status: '可调配' as ResourceStatus,
         auditStatus: '待审核' as AuditStatus,
+        privacyAgreementAccepted: false,
         auditMaterials: {
-          licenseFront: driverPhotos,
-          licenseBack: driverLicense,
-          other: driverOtherMaterials
+          licenseFront: driverLicenseFront,
+          licenseBack: driverLicenseBack,
+          photos: driverPhotos,
+          otherQualifications: driverOtherMaterials
         }
       };
       dispatch({ type: 'ADD_DRIVER', payload: newDriver });
@@ -1378,8 +1390,84 @@ function PCApp() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">审核材料</label>
             
+            {/* 驾驶证正本 */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-500 mb-1">身份证照片</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-500">驾驶证正本 <span className="text-red-500">*</span></label>
+                <span className="text-xs text-slate-400">JPG/PNG · ≤10MB</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {driverLicenseFront.map((_, index) => (
+                  <div
+                    key={index}
+                    className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <CreditCard size={24} className="text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItems = [...driverLicenseFront];
+                        newItems.splice(index, 1);
+                        setDriverLicenseFront(newItems);
+                      }}
+                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setDriverLicenseFront([...driverLicenseFront, ''])}
+                  className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
+                >
+                  <Plus size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* 驾驶证副本 */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-500">驾驶证副本 <span className="text-red-500">*</span></label>
+                <span className="text-xs text-slate-400">JPG/PNG · ≤10MB</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {driverLicenseBack.map((_, index) => (
+                  <div
+                    key={index}
+                    className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <CreditCard size={24} className="text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItems = [...driverLicenseBack];
+                        newItems.splice(index, 1);
+                        setDriverLicenseBack(newItems);
+                      }}
+                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setDriverLicenseBack([...driverLicenseBack, ''])}
+                  className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
+                >
+                  <Plus size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* 照片 */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-500">照片</label>
+                <span className="text-xs text-slate-400">可选 · JPG/PNG · 最多5张 · 单张≤10MB</span>
+              </div>
               <div className="flex gap-2 flex-wrap">
                 {driverPhotos.map((_, index) => (
                   <div
@@ -1390,9 +1478,9 @@ function PCApp() {
                     <button
                       type="button"
                       onClick={() => {
-                        const newPhotos = [...driverPhotos];
-                        newPhotos.splice(index, 1);
-                        setDriverPhotos(newPhotos);
+                        const newItems = [...driverPhotos];
+                        newItems.splice(index, 1);
+                        setDriverPhotos(newItems);
                       }}
                       className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
                     >
@@ -1400,50 +1488,24 @@ function PCApp() {
                     </button>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setDriverPhotos([...driverPhotos, ''])}
-                  className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
-                >
-                  <Plus size={24} />
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-500 mb-1">驾驶证</label>
-              <div className="flex gap-2 flex-wrap">
-                {driverLicense.map((_, index) => (
-                  <div
-                    key={index}
-                    className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
+                {driverPhotos.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setDriverPhotos([...driverPhotos, ''])}
+                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
                   >
-                    <FileText size={24} className="text-slate-400" />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newLicense = [...driverLicense];
-                        newLicense.splice(index, 1);
-                        setDriverLicense(newLicense);
-                      }}
-                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setDriverLicense([...driverLicense, ''])}
-                  className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
-                >
-                  <Plus size={24} />
-                </button>
+                    <Plus size={24} />
+                  </button>
+                )}
               </div>
             </div>
 
+            {/* 其他资质材料 */}
             <div>
-              <label className="block text-sm font-medium text-slate-500 mb-1">其他材料</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-500">其他资质材料</label>
+                <span className="text-xs text-slate-400">可选 · JPG/PNG/PDF · 最多5份 · 单份≤10MB</span>
+              </div>
               <div className="flex gap-2 flex-wrap">
                 {driverOtherMaterials.map((_, index) => (
                   <div
@@ -1454,9 +1516,9 @@ function PCApp() {
                     <button
                       type="button"
                       onClick={() => {
-                        const newMaterials = [...driverOtherMaterials];
-                        newMaterials.splice(index, 1);
-                        setDriverOtherMaterials(newMaterials);
+                        const newItems = [...driverOtherMaterials];
+                        newItems.splice(index, 1);
+                        setDriverOtherMaterials(newItems);
                       }}
                       className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
                     >
@@ -1464,13 +1526,15 @@ function PCApp() {
                     </button>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setDriverOtherMaterials([...driverOtherMaterials, ''])}
-                  className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
-                >
-                  <Plus size={24} />
-                </button>
+                {driverOtherMaterials.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setDriverOtherMaterials([...driverOtherMaterials, ''])}
+                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
+                  >
+                    <Plus size={24} />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1730,17 +1794,17 @@ function PCApp() {
       </Modal>
 
       <Modal isOpen={activeModal === 'NEW_TASK' || activeModal === 'EDIT_TASK'} onClose={handleClose} title={activeModal === 'NEW_TASK' ? '新建任务' : '编辑任务'} size="xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* 活动选择 */}
           {activeModal === 'NEW_TASK' && (
-            <div>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 所属活动 <span className="text-red-500">*</span>
               </label>
               <select
                 value={selectedActivityId}
                 onChange={(e) => setSelectedActivityId(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none bg-white"
                 required
               >
                 <option value="">请选择活动</option>
@@ -1751,284 +1815,409 @@ function PCApp() {
             </div>
           )}
           
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              任务名称 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              defaultValue={activeModal === 'EDIT_TASK' ? modalData?.name : ''}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
-              placeholder="如：6月10日张局长接机"
-              required
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">任务类型</label>
-              <select
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.type : '接送机'}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-              >
-                <option value="接送机">接送机</option>
-                <option value="办事出行">办事出行</option>
-                <option value="会议通勤">会议通勤</option>
-                <option value="考察调研">考察调研</option>
-                <option value="其他">其他</option>
-              </select>
+          {/* 基本信息 */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <FileText size={16} className="text-brand-600" />
+                基本信息
+              </h4>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">任务日期</label>
-              <input
-                type="date"
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : ''}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                required
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">开始时间</label>
-              <input
-                type="time"
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.startTime : ''}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">结束时间</label>
-              <input
-                type="time"
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.endTime : ''}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                required
-              />
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  任务名称 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.name : ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
+                  placeholder="如：6月10日张局长接机"
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">任务类型</label>
+                  <select
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.type : '接送机'}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                  >
+                    <option value="接送机">接送机</option>
+                    <option value="办事出行">办事出行</option>
+                    <option value="会议通勤">会议通勤</option>
+                    <option value="考察调研">考察调研</option>
+                    <option value="其他">其他</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">任务日期 <span className="text-red-500">*</span></label>
+                  <input
+                    type="date"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : ''}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">现场调度员 <span className="text-red-500">*</span></label>
+                  <select
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fieldDispatcher : '当前用户'}
+                    onChange={(e) => setFormData({ ...formData, fieldDispatcher: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                    required
+                  >
+                    <option value="当前用户">当前用户（默认）</option>
+                    <option value="陈某">陈某</option>
+                    <option value="李某">李某</option>
+                    <option value="王某">王某</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">开始时间 <span className="text-red-500">*</span></label>
+                  <input
+                    type="time"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.startTime : ''}
+                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">结束时间 <span className="text-red-500">*</span></label>
+                  <input
+                    type="time"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.endTime : ''}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                    required
+                  />
+                </div>
+              </div>
             </div>
           </div>
           
           {/* 行程安排 */}
-          <div className="bg-slate-50 p-4 rounded-xl">
-            <label className="block text-sm font-medium text-slate-700 mb-3">行程安排</label>
-            
-            {/* 出发地 */}
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <MapPin size={18} className="text-green-600" />
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <Route size={16} className="text-brand-600" />
+                行程安排
+              </h4>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* 出发地 */}
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <MapPin size={20} className="text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-green-600 font-medium mb-1">出发地</label>
+                  <input
+                    type="text"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.from : ''}
+                    onChange={(e) => setFormData({ ...formData, from: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                    placeholder="出发地点"
+                    required
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="block text-xs text-slate-500 mb-1">出发时间</label>
+                  <input
+                    type="time"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fromTime : ''}
+                    onChange={(e) => setFormData({ ...formData, fromTime: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                  />
+                </div>
               </div>
-              <div className="flex-1">
-                <label className="block text-xs text-slate-500 mb-1">出发地</label>
-                <input
-                  type="text"
-                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.from : ''}
-                  onChange={(e) => setFormData({ ...formData, from: e.target.value })}
-                  className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                  placeholder="出发地点"
-                  required
-                />
+              
+              {/* 途经点 */}
+              {formData.waypoints && formData.waypoints.length > 0 && (
+                <div className="space-y-3 pl-4 border-l-2 border-dashed border-slate-200 ml-6">
+                  {formData.waypoints.map((waypoint: { name: string; time?: string }, index: number) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-blue-600 font-medium mb-1">途经点 {index + 1}</label>
+                        <input
+                          type="text"
+                          value={waypoint.name}
+                          onChange={(e) => {
+                            const newWaypoints = [...(formData.waypoints || [])];
+                            newWaypoints[index] = { ...newWaypoints[index], name: e.target.value };
+                            setFormData({ ...formData, waypoints: newWaypoints });
+                          }}
+                          className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                          placeholder="途经点名称"
+                        />
+                      </div>
+                      <div className="w-32">
+                        <label className="block text-xs text-slate-500 mb-1">预计时间</label>
+                        <input
+                          type="time"
+                          value={waypoint.time || ''}
+                          onChange={(e) => {
+                            const newWaypoints = [...(formData.waypoints || [])];
+                            newWaypoints[index] = { ...newWaypoints[index], time: e.target.value };
+                            setFormData({ ...formData, waypoints: newWaypoints });
+                          }}
+                          className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newWaypoints = (formData.waypoints || []).filter((_: any, i: number) => i !== index);
+                          setFormData({ ...formData, waypoints: newWaypoints });
+                        }}
+                        className="p-2 text-red-500 hover:text-red-700 flex-shrink-0"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* 添加途经点按钮 */}
+              <button
+                type="button"
+                onClick={() => {
+                  const newWaypoints = [...(formData.waypoints || []), { name: '', order: (formData.waypoints?.length || 0) + 1, time: '' }];
+                  setFormData({ ...formData, waypoints: newWaypoints });
+                }}
+                className="ml-6 text-brand-600 hover:text-brand-700 text-sm font-medium flex items-center gap-1"
+              >
+                <Plus size={14} />
+                添加途经点
+              </button>
+              
+              {/* 目的地 */}
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <MapPin size={20} className="text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-red-600 font-medium mb-1">目的地</label>
+                  <input
+                    type="text"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.to : ''}
+                    onChange={(e) => setFormData({ ...formData, to: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                    placeholder="目的地点"
+                    required
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="block text-xs text-slate-500 mb-1">到达时间</label>
+                  <input
+                    type="time"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.toTime : ''}
+                    onChange={(e) => setFormData({ ...formData, toTime: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                  />
+                </div>
               </div>
-              <div className="w-36">
-                <label className="block text-xs text-slate-500 mb-1">出发时间</label>
+            </div>
+          </div>
+          
+          {/* 乘车人信息 */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <Users size={16} className="text-brand-600" />
+                乘车人信息
+              </h4>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">乘车人</label>
+                  <input
+                    type="text"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passenger : ''}
+                    onChange={(e) => setFormData({ ...formData, passenger: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">联系电话</label>
+                  <input
+                    type="tel"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerPhone : ''}
+                    onChange={(e) => setFormData({ ...formData, passengerPhone: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">乘车人数</label>
                 <input
-                  type="time"
-                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fromTime : ''}
-                  onChange={(e) => setFormData({ ...formData, fromTime: e.target.value })}
-                  className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                  placeholder="可选"
+                  type="number"
+                  min="1"
+                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerCount : ''}
+                  onChange={(e) => setFormData({ ...formData, passengerCount: parseInt(e.target.value) })}
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                  placeholder="用于匹配车辆座位数"
                 />
               </div>
             </div>
-            
-            {/* 途经点 */}
-            {formData.waypoints && formData.waypoints.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {formData.waypoints.map((waypoint: { name: string; time?: string }, index: number) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-blue-600 text-xs font-bold">{index + 1}</span>
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs text-slate-500 mb-1">途经点 {index + 1}</label>
-                      <input
-                        type="text"
-                        value={waypoint.name}
-                        onChange={(e) => {
-                          const newWaypoints = [...(formData.waypoints || [])];
-                          newWaypoints[index] = { ...newWaypoints[index], name: e.target.value };
-                          setFormData({ ...formData, waypoints: newWaypoints });
-                        }}
-                        className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                        placeholder="途经点名称"
-                      />
-                    </div>
-                    <div className="w-36">
-                      <label className="block text-xs text-slate-500 mb-1">预计时间</label>
-                      <input
-                        type="time"
-                        value={waypoint.time || ''}
-                        onChange={(e) => {
-                          const newWaypoints = [...(formData.waypoints || [])];
-                          newWaypoints[index] = { ...newWaypoints[index], time: e.target.value };
-                          setFormData({ ...formData, waypoints: newWaypoints });
-                        }}
-                        className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newWaypoints = (formData.waypoints || []).filter((_: any, i: number) => i !== index);
-                        setFormData({ ...formData, waypoints: newWaypoints });
-                      }}
-                      className="p-2 text-red-500 hover:text-red-700"
-                    >
-                      <X size={16} />
-                    </button>
+          </div>
+          
+          {/* 资源分配 */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <Car size={16} className="text-brand-600" />
+                资源分配
+              </h4>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">分配车辆</label>
+                {formData.vehicleId ? (
+                  // 已选中车辆时的展示
+                  <div className="border-2 border-brand-300 bg-brand-50 rounded-xl p-4">
+                    {(() => {
+                      const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
+                      return selectedVehicle ? (
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">已选择</span>
+                            </div>
+                            <p className="font-bold text-slate-900 text-lg">{selectedVehicle.plateNumber}</p>
+                            <p className="text-sm text-slate-500 mt-1">
+                              <span className="inline-block mr-2">{selectedVehicle.type}</span>
+                              <span className="inline-block mr-2">{selectedVehicle.capacity}座</span>
+                              <span className="inline-block">{selectedVehicle.brand}</span>
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setFormData({ ...formData, vehicleId: '' })}
+                            className="text-slate-400 hover:text-slate-600 p-1"
+                            title="更换车辆"
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
-                ))}
+                ) : (
+                  // 未选中时显示筛选和列表
+                  <>
+                    {/* 筛选条件 */}
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <select
+                        value={vehicleTypeFilter}
+                        onChange={(e) => setVehicleTypeFilter(e.target.value)}
+                        className="p-2.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                      >
+                        <option value="">全部车型</option>
+                        {[...new Set(vehicles.map(v => v.type).filter(Boolean))].map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={vehicleCapacityFilter}
+                        onChange={(e) => setVehicleCapacityFilter(e.target.value)}
+                        className="p-2.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                      >
+                        <option value="">全部核载人数</option>
+                        {[...new Set(vehicles.map(v => v.capacity).filter(Boolean))].sort((a, b) => Number(a) - Number(b)).map(cap => (
+                          <option key={cap} value={cap}>{cap}座</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* 车辆列表 */}
+                    <div className="border border-slate-200 rounded-xl max-h-48 overflow-y-auto">
+                      {vehicles.filter(v => 
+                        (v.status === '可调配' || v.id === modalData?.vehicleId) &&
+                        (!vehicleTypeFilter || v.type === vehicleTypeFilter) &&
+                        (!vehicleCapacityFilter || v.capacity === Number(vehicleCapacityFilter))
+                      ).length > 0 ? (
+                        vehicles.filter(v => 
+                          (v.status === '可调配' || v.id === modalData?.vehicleId) &&
+                          (!vehicleTypeFilter || v.type === vehicleTypeFilter) &&
+                          (!vehicleCapacityFilter || v.capacity === Number(vehicleCapacityFilter))
+                        ).map(v => (
+                          <div
+                            key={v.id}
+                            onClick={() => setFormData({ ...formData, vehicleId: v.id })}
+                            className="p-3 border-b border-slate-100 cursor-pointer hover:bg-slate-50 last:border-b-0 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold text-slate-900">{v.plateNumber}</p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  <span className="inline-block mr-2">{v.type}</span>
+                                  <span className="inline-block mr-2">{v.capacity}座</span>
+                                  <span className="inline-block">{v.brand}</span>
+                                </p>
+                              </div>
+                              <span className={cn(
+                                "px-2 py-0.5 rounded text-xs font-medium",
+                                v.status === '可调配' ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
+                              )}>{v.status}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-slate-400 text-sm">暂无符合条件的车辆</div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-            
-            {/* 添加途经点按钮 */}
-            <button
-              type="button"
-              onClick={() => {
-                const newWaypoints = [...(formData.waypoints || []), { name: '', order: (formData.waypoints?.length || 0) + 1, time: '' }];
-                setFormData({ ...formData, waypoints: newWaypoints });
-              }}
-              className="text-brand-600 hover:text-brand-700 text-sm font-medium flex items-center gap-1 mb-3"
-            >
-              <Plus size={14} />
-              添加途经点
-            </button>
-            
-            {/* 目的地 */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <MapPin size={18} className="text-red-600" />
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">分配司机</label>
+                <select
+                  value={formData.driverId || ''}
+                  onChange={(e) => setFormData({ ...formData, driverId: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                >
+                  <option value="">暂不分配</option>
+                  {drivers.filter(d => d.status === '可调配' || d.id === modalData?.driverId).map(d => (
+                    <option key={d.id} value={d.id}>{d.name} - {d.phone}</option>
+                  ))}
+                </select>
               </div>
-              <div className="flex-1">
-                <label className="block text-xs text-slate-500 mb-1">目的地</label>
-                <input
-                  type="text"
-                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.to : ''}
-                  onChange={(e) => setFormData({ ...formData, to: e.target.value })}
-                  className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                  placeholder="目的地点"
-                  required
-                />
-              </div>
-              <div className="w-36">
-                <label className="block text-xs text-slate-500 mb-1">到达时间</label>
-                <input
-                  type="time"
-                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.toTime : ''}
-                  onChange={(e) => setFormData({ ...formData, toTime: e.target.value })}
-                  className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                  placeholder="可选"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">乘车人</label>
-              <input
-                type="text"
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passenger : ''}
-                onChange={(e) => setFormData({ ...formData, passenger: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">联系电话</label>
-              <input
-                type="tel"
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerPhone : ''}
-                onChange={(e) => setFormData({ ...formData, passengerPhone: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">乘车人数</label>
-              <input
-                type="number"
-                min="1"
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerCount : ''}
-                onChange={(e) => setFormData({ ...formData, passengerCount: parseInt(e.target.value) })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                placeholder="用于匹配车辆座位数"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">现场调度员 <span className="text-red-500">*</span></label>
-              <select
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fieldDispatcher : '当前用户'}
-                onChange={(e) => setFormData({ ...formData, fieldDispatcher: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                required
-              >
-                <option value="当前用户">当前用户（默认）</option>
-                <option value="陈某">陈某</option>
-                <option value="李某">李某</option>
-                <option value="王某">王某</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">分配车辆</label>
-              <select
-                value={formData.vehicleId || ''}
-                onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-              >
-                <option value="">暂不分配</option>
-                {vehicles.filter(v => v.status === '可调配' || v.id === modalData?.vehicleId).map(v => (
-                  <option key={v.id} value={v.id}>{v.plateNumber} - {v.brand || v.type}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">分配司机</label>
-              <select
-                value={formData.driverId || ''}
-                onChange={(e) => setFormData({ ...formData, driverId: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-              >
-                <option value="">暂不分配</option>
-                {drivers.filter(d => d.status === '可调配' || d.id === modalData?.driverId).map(d => (
-                  <option key={d.id} value={d.id}>{d.name} - {d.phone}</option>
-                ))}
-              </select>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">任务描述</label>
-            <textarea
-              defaultValue={activeModal === 'EDIT_TASK' ? modalData?.description : ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={3}
-              className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none resize-none"
-              placeholder="特殊要求、注意事项等"
-            />
+          {/* 任务描述 */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <FileText size={16} className="text-brand-600" />
+                备注信息
+              </h4>
+            </div>
+            <div className="p-4">
+              <textarea
+                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.description : ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none resize-none"
+                placeholder="特殊要求、注意事项等"
+              />
+            </div>
           </div>
 
-          <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2">
+          <button type="submit" className="w-full bg-brand-600 text-white py-3.5 rounded-xl font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2">
             <CheckCircle2 size={20} />
             {activeModal === 'NEW_TASK' ? '创建任务' : '保存修改'}
           </button>
@@ -2038,29 +2227,25 @@ function PCApp() {
       <Modal isOpen={activeModal === 'TASK_DETAIL'} onClose={handleClose} title="任务详情" size="xl">
         {modalData && (
           <div className="space-y-6">
-            {/* 异常标签区域 */}
+            {/* 异常告警 */}
             {(() => {
               const abnormalRules = getTaskAbnormalRules(modalData);
               if (abnormalRules.length > 0) {
                 return (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                       <AlertCircle size={18} className="text-red-600" />
-                      <span className="font-bold text-red-700">异常任务</span>
+                      <span className="font-bold text-red-700">异常告警</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="space-y-2">
                       {abnormalRules.map((rule, index) => (
-                        <span key={index} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm flex items-center gap-1">
-                          <span className="font-bold">{rule.code}</span>
-                          <span>{rule.name}</span>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      {abnormalRules.map((rule, index) => (
-                        <p key={index} className="text-xs text-red-600">
-                          {rule.code} {rule.name}：{rule.description}
-                        </p>
+                        <div key={index} className="flex items-start gap-2">
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold flex-shrink-0">{rule.code}</span>
+                          <div>
+                            <p className="text-sm font-medium text-red-800">{rule.name}</p>
+                            <p className="text-xs text-red-600">{rule.description}</p>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -2069,169 +2254,214 @@ function PCApp() {
               return null;
             })()}
             
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-2xl font-bold text-slate-900">{modalData.name || '未命名任务'}</h3>
-                <p className="text-sm text-slate-500">{modalData.date} {modalData.startTime} - {modalData.endTime}</p>
-              </div>
-              <span className={cn(
-                "px-4 py-2 rounded-full text-sm font-bold",
-                modalData.status === '执行中' ? "bg-green-100 text-green-700" :
-                modalData.status === '待接收' ? "bg-blue-100 text-blue-700" :
-                modalData.status === '已接收' ? "bg-purple-100 text-purple-700" :
-                modalData.status === '待派发' ? "bg-yellow-100 text-yellow-700" :
-                modalData.status === '已取消' ? "bg-red-100 text-red-700" :
-                modalData.status === '已拒绝' ? "bg-orange-100 text-orange-700" :
-                "bg-slate-100 text-slate-700"
-              )}>{modalData.status || '未知'}</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-xl">
-                <p className="text-xs text-slate-500 mb-1">任务类型</p>
-                <p className="font-medium text-slate-900">{modalData.type || '未设置'}</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl">
-                <p className="text-xs text-slate-500 mb-1">乘车人</p>
-                <p className="font-medium text-slate-900">{modalData.passenger || '未填写'}</p>
-                {modalData.passengerPhone && (
-                  <p className="text-sm text-slate-500">{modalData.passengerPhone}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-xl">
-                <p className="text-xs text-slate-500 mb-1">乘车人数</p>
-                <p className="font-medium text-slate-900">{modalData.passengerCount || '未填写'}</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl">
-                <p className="text-xs text-slate-500 mb-1">现场调度员</p>
-                <p className="font-medium text-slate-900">{modalData.fieldDispatcher || '未指定'}</p>
-              </div>
-            </div>
-
-            {/* 行程安排 */}
-            <div className="bg-slate-50 p-4 rounded-xl">
-              <p className="text-xs text-slate-500 mb-3 font-medium">行程安排</p>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                {/* 出发地 */}
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MapPin size={18} className="text-green-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-900 text-sm">{modalData.from || '未设置'}</p>
-                    {modalData.fromTime && <p className="text-xs text-slate-500">出发 {modalData.fromTime}</p>}
-                  </div>
+            {/* 基本信息卡片 */}
+            <div className="bg-gradient-to-r from-brand-600 to-blue-700 rounded-xl p-5 text-white">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="text-xl font-bold mb-1">{modalData.name || '未命名任务'}</h3>
+                  <p className="text-white/80 text-sm">{modalData.date} {modalData.startTime} - {modalData.endTime}</p>
                 </div>
-                
-                {/* 箭头 */}
-                <ChevronRight size={20} className="text-slate-300 flex-shrink-0" />
-                
-                {/* 途经点 */}
-                {modalData.waypoints && modalData.waypoints.length > 0 && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      {modalData.waypoints.map((waypoint: { name: string; time?: string }, index: number) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <span className="text-blue-600 text-xs font-bold">{index + 1}</span>
-                          </div>
-                          <div className="min-w-[80px]">
-                            <p className="font-medium text-slate-900 text-sm">{waypoint.name}</p>
-                            {waypoint.time && <p className="text-xs text-slate-500">{waypoint.time}</p>}
-                          </div>
-                          {index < modalData.waypoints!.length - 1 && (
-                            <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
-                          )}
-                        </div>
-                      ))}
+                <span className={cn(
+                  "px-3 py-1.5 rounded-full text-sm font-bold",
+                  modalData.status === '执行中' ? "bg-green-400 text-green-900" :
+                  modalData.status === '待接收' ? "bg-blue-400 text-blue-900" :
+                  modalData.status === '已接收' ? "bg-purple-400 text-purple-900" :
+                  modalData.status === '待派发' ? "bg-yellow-400 text-yellow-900" :
+                  modalData.status === '已取消' ? "bg-red-400 text-red-900" :
+                  modalData.status === '已拒绝' ? "bg-orange-400 text-orange-900" :
+                  "bg-slate-400 text-slate-900"
+                )}>{modalData.status || '未知'}</span>
+              </div>
+              <div className="flex items-center gap-4 text-white/70 text-sm">
+                <span className="flex items-center gap-1">
+                  <MapPin size={14} />
+                  {modalData.from}
+                </span>
+                <ChevronRight size={14} />
+                <span>{modalData.to}</span>
+              </div>
+            </div>
+
+            {/* 行程信息 */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                <h4 className="font-bold text-slate-700 text-sm">行程安排</h4>
+              </div>
+              <div className="p-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  {/* 出发地 */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <MapPin size={18} className="text-green-600" />
                     </div>
-                    <ChevronRight size={20} className="text-slate-300 flex-shrink-0" />
-                  </>
-                )}
-                
-                {/* 目的地 */}
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MapPin size={18} className="text-red-600" />
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">出发地</p>
+                      <p className="font-medium text-slate-900">{modalData.from || '未设置'}</p>
+                      {modalData.fromTime && <p className="text-xs text-slate-500">{modalData.fromTime}</p>}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-900 text-sm">{modalData.to || '未设置'}</p>
-                    {modalData.toTime && <p className="text-xs text-slate-500">到达 {modalData.toTime}</p>}
+                  
+                  {/* 箭头 */}
+                  <ChevronRight size={20} className="text-slate-300 flex-shrink-0" />
+                  
+                  {/* 途经点 */}
+                  {modalData.waypoints && modalData.waypoints.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        {modalData.waypoints.map((waypoint: { name: string; time?: string }, index: number) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-400 mb-0.5">途经点{index + 1}</p>
+                              <p className="font-medium text-slate-900 text-sm">{waypoint.name}</p>
+                              {waypoint.time && <p className="text-xs text-slate-500">{waypoint.time}</p>}
+                            </div>
+                            {index < modalData.waypoints.length - 1 && (
+                              <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <ChevronRight size={20} className="text-slate-300 flex-shrink-0" />
+                    </>
+                  )}
+                  
+                  {/* 目的地 */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <MapPin size={18} className="text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">目的地</p>
+                      <p className="font-medium text-slate-900">{modalData.to || '未设置'}</p>
+                      {modalData.toTime && <p className="text-xs text-slate-500">{modalData.toTime}</p>}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-xl">
-                <p className="text-xs text-slate-500 mb-2">分配车辆</p>
-                {modalData.vehicleId ? (
-                  (() => {
-                    const v = vehicles.find(vv => vv.id === modalData.vehicleId);
-                    return v ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center">
-                          <Car size={18} className="text-brand-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{v.plateNumber}</p>
-                          <p className="text-xs text-slate-500">{v.brand} · {v.supplier}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-slate-400">车辆信息不存在</p>
-                    );
-                  })()
-                ) : (
-                  <p className="text-slate-400">未分配车辆</p>
-                )}
+            {/* 任务信息 */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                <h4 className="font-bold text-slate-700 text-sm">任务信息</h4>
               </div>
-              <div className="bg-slate-50 p-4 rounded-xl">
-                <p className="text-xs text-slate-500 mb-2">分配司机</p>
-                {modalData.driverId ? (
-                  (() => {
-                    const d = drivers.find(dd => dd.id === modalData.driverId);
-                    return d ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center">
-                          <Users size={18} className="text-brand-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{d.name}</p>
-                          <p className="text-xs text-slate-500">{d.phone} · {d.licenseType}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-slate-400">司机信息不存在</p>
-                    );
-                  })()
-                ) : (
-                  <p className="text-slate-400">未分配司机</p>
+              <div className="p-5">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">任务类型</span>
+                    <span className="text-sm font-medium text-slate-900">{modalData.type || '未设置'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">乘车人数</span>
+                    <span className="text-sm font-medium text-slate-900">{modalData.passengerCount || '未填写'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">乘车人</span>
+                    <span className="text-sm font-medium text-slate-900">{modalData.passenger || '未填写'}</span>
+                  </div>
+                  {modalData.passengerPhone && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-500">联系电话</span>
+                      <span className="text-sm font-medium text-slate-900">{modalData.passengerPhone}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">现场调度员</span>
+                    <span className="text-sm font-medium text-slate-900">{modalData.fieldDispatcher || '未指定'}</span>
+                  </div>
+                  {modalData.fieldDispatcherPhone && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-500">调度员电话</span>
+                      <span className="text-sm font-medium text-slate-900">{modalData.fieldDispatcherPhone}</span>
+                    </div>
+                  )}
+                </div>
+                {modalData.description && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <span className="text-sm text-slate-500 block mb-2">任务描述</span>
+                    <p className="text-sm text-slate-700">{modalData.description}</p>
+                  </div>
                 )}
               </div>
             </div>
 
-            {modalData.description && (
-              <div className="bg-slate-50 p-4 rounded-xl">
-                <p className="text-xs text-slate-500 mb-1">任务描述</p>
-                <p className="text-slate-700">{modalData.description}</p>
+            {/* 资源分配 */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                <h4 className="font-bold text-slate-700 text-sm">资源分配</h4>
               </div>
-            )}
-
-            {modalData.rejectReason && (
-              <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                <p className="text-xs text-orange-600 mb-1">拒绝原因</p>
-                <p className="text-orange-800">{modalData.rejectReason}</p>
+              <div className="p-5 space-y-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">分配车辆</p>
+                    {modalData.vehicleId ? (
+                      (() => {
+                        const v = vehicles.find(vv => vv.id === modalData.vehicleId);
+                        return v ? (
+                          <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-lg">
+                            <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center">
+                              <Car size={18} className="text-brand-600" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-slate-900">{v.plateNumber}</p>
+                              <p className="text-xs text-slate-500">{v.brand} · {v.type} · {v.capacity}座</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 text-sm">车辆信息不存在</p>
+                        );
+                      })()
+                    ) : (
+                      <p className="text-slate-400 text-sm">未分配车辆</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">分配司机</p>
+                    {modalData.driverId ? (
+                      (() => {
+                        const d = drivers.find(dd => dd.id === modalData.driverId);
+                        return d ? (
+                          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                              <Users size={18} className="text-blue-600" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-slate-900">{d.name}</p>
+                              <p className="text-xs text-slate-500">{d.phone} · {d.licenseType}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 text-sm">司机信息不存在</p>
+                        );
+                      })()
+                    ) : (
+                      <p className="text-slate-400 text-sm">未分配司机</p>
+                    )}
+                  </div>
               </div>
-            )}
+            </div>
 
-            {modalData.cancelReason && (
-              <div className="bg-red-50 p-4 rounded-xl border border-red-200">
-                <p className="text-xs text-red-600 mb-1">取消原因</p>
-                <p className="text-red-800">{modalData.cancelReason}</p>
+            {/* 异常信息 */}
+            {(modalData.rejectReason || modalData.cancelReason) && (
+              <div className={cn(
+                "rounded-xl p-4",
+                modalData.rejectReason ? "bg-orange-50 border border-orange-200" : "bg-red-50 border border-red-200"
+              )}>
+                <h4 className={cn(
+                  "font-bold text-sm mb-2 flex items-center gap-2",
+                  modalData.rejectReason ? "text-orange-700" : "text-red-700"
+                )}>
+                  <AlertCircle size={16} />
+                  {modalData.rejectReason ? '拒绝原因' : '取消原因'}
+                </h4>
+                <p className={cn(
+                  "text-sm",
+                  modalData.rejectReason ? "text-orange-800" : "text-red-800"
+                )}>
+                  {modalData.rejectReason || modalData.cancelReason}
+                </p>
               </div>
             )}
 

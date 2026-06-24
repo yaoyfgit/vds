@@ -15,9 +15,10 @@ import {
   Building,
   Eye,
   FileCheck,
-  Map
+  Map,
+  X
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, isTaskAbnormal, getTaskAbnormalRules } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import ActivityDetail from './ActivityDetail';
 import { SuppliersView } from './SupplierDetail';
@@ -25,7 +26,7 @@ import VehicleDetail from './VehicleDetail';
 import DriverDetail from './DriverDetail';
 import AuditManagementView from './AuditManagementView';
 import TrackScreen from './TrackScreen';
-import type { Activity, Vehicle, Driver } from '../../types';
+import type { Activity, Vehicle, Driver, Task } from '../../types';
 
 const PCLayout: React.FC<{
   activeTab: string;
@@ -244,6 +245,9 @@ const TasksView = () => {
   const [filterDispatcher, setFilterDispatcher] = useState<string>('');
   const [filterAbnormal, setFilterAbnormal] = useState<string>('');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [showSuspendAuditModal, setShowSuspendAuditModal] = useState(false);
+  const [taskToAudit, setTaskToAudit] = useState<Task | null>(null);
+  const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
 
   const uniqueDispatchers = [...new Set(tasks.map(t => t.fieldDispatcher).filter(Boolean))];
 
@@ -253,10 +257,10 @@ const TasksView = () => {
     if (filterDate && task.date !== filterDate) return false;
     if (filterDispatcher && task.fieldDispatcher !== filterDispatcher) return false;
     if (filterAbnormal === 'abnormal') {
-      return task.status === '已拒绝' || task.status === '已取消';
+      return isTaskAbnormal(task);
     }
     if (filterAbnormal === 'normal') {
-      return task.status !== '已拒绝' && task.status !== '已取消';
+      return !isTaskAbnormal(task);
     }
     if (searchKeyword) {
       const keyword = searchKeyword.toLowerCase();
@@ -270,7 +274,35 @@ const TasksView = () => {
       return matchName || matchVehicle || matchDriver;
     }
     return true;
+  }).sort((a, b) => {
+    const aAbnormal = isTaskAbnormal(a) ? 1 : 0;
+    const bAbnormal = isTaskAbnormal(b) ? 1 : 0;
+    const aSuspendRequested = a.suspendRequested ? 1 : 0;
+    const bSuspendRequested = b.suspendRequested ? 1 : 0;
+    
+    if (aAbnormal !== bAbnormal) return bAbnormal - aAbnormal;
+    if (aSuspendRequested !== bSuspendRequested) return bSuspendRequested - aSuspendRequested;
+    return 0;
   });
+
+  const handleAuditSuspend = (approve: boolean) => {
+    if (!taskToAudit) return;
+    if (approve) {
+      dispatch({ type: 'SET_TASK_STATUS', payload: { id: taskToAudit.id, status: '已暂停' } });
+      dispatch({ 
+        type: 'UPDATE_TASK', 
+        payload: { id: taskToAudit.id, data: { suspendRequested: false } }
+      });
+    } else {
+      dispatch({ type: 'SET_TASK_STATUS', payload: { id: taskToAudit.id, status: '执行中' } });
+      dispatch({ 
+        type: 'UPDATE_TASK', 
+        payload: { id: taskToAudit.id, data: { suspendRequested: false, suspendReason: undefined } }
+      });
+    }
+    setShowSuspendAuditModal(false);
+    setTaskToAudit(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -356,10 +388,69 @@ const TasksView = () => {
         </div>
       </div>
 
+      {/* 批量操作栏 */}
+      {selectedTasks.length > 0 && (
+        <div className="bg-brand-50 border border-brand-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-brand-700">已选择 {selectedTasks.length} 项</span>
+            <button
+              onClick={() => setSelectedTasks([])}
+              className="text-xs text-slate-500 hover:text-slate-700"
+            >
+              取消选择
+            </button>
+          </div>
+          <div className="flex gap-2">
+            {selectedTasks.some(t => t.status === '待派发') && (
+              <button
+                onClick={() => {
+                  if (confirm(`确定要派发选中的 ${selectedTasks.filter(t => t.status === '待派发').length} 个任务吗？`)) {
+                    selectedTasks.filter(t => t.status === '待派发').forEach(task => {
+                      dispatch({ type: 'SET_TASK_STATUS', payload: { id: task.id, status: '待接收', reason: '批量派发' } });
+                    });
+                    setSelectedTasks([]);
+                  }
+                }}
+                className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium"
+              >
+                批量派发
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (confirm(`确定要取消选中的 ${selectedTasks.length} 个任务吗？`)) {
+                  selectedTasks.forEach(task => {
+                    dispatch({ type: 'SET_TASK_STATUS', payload: { id: task.id, status: '已取消', reason: '批量取消' } });
+                  });
+                  setSelectedTasks([]);
+                }
+              }}
+              className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-sm font-medium"
+            >
+              批量取消
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <th className="px-4 py-4 w-10">
+                <input
+                  type="checkbox"
+                  checked={selectedTasks.length === filteredTasks.length && filteredTasks.length > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedTasks(filteredTasks);
+                    } else {
+                      setSelectedTasks([]);
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+              </th>
               <th className="px-6 py-4">任务名称</th>
               <th className="px-6 py-4">任务类型</th>
               <th className="px-6 py-4">时间/地点</th>
@@ -376,11 +467,40 @@ const TasksView = () => {
                 const vehicle = vehicles.find(v => v.id === task.vehicleId);
                 const driver = drivers.find(d => d.id === task.driverId);
                 const activity = activities.find(a => a.id === task.activityId);
+                const isAbnormal = isTaskAbnormal(task);
+                const isSelected = selectedTasks.some(t => t.id === task.id);
                 return (
-                  <tr key={task.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={task.id} className={cn(
+                    "hover:bg-slate-50/50 transition-colors",
+                    isAbnormal && "bg-red-50",
+                    isSelected && "bg-brand-50/50"
+                  )}>
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTasks([...selectedTasks, task]);
+                          } else {
+                            setSelectedTasks(selectedTasks.filter(t => t.id !== task.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="font-semibold text-slate-900">{task.name}</div>
                       <div className="text-xs text-slate-400">{activity?.name || '未关联活动'}</div>
+                      {isAbnormal && (
+                        <div className="flex gap-1 mt-1">
+                          {getTaskAbnormalRules(task).map(rule => (
+                            <span key={rule.code} className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">
+                              {rule.code}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-slate-600">{task.type}</span>
@@ -411,25 +531,58 @@ const TasksView = () => {
                         task.status === '已完成' ? "bg-slate-200 text-slate-700" :
                         task.status === '已取消' ? "bg-red-100 text-red-700" :
                         task.status === '已拒绝' ? "bg-orange-100 text-orange-700" :
+                        task.status === '已暂停' ? "bg-amber-100 text-amber-700" :
+                        task.status === '待审批' ? "bg-yellow-100 text-yellow-700" :
                         "bg-yellow-100 text-yellow-700"
                       )}>
                         {task.status}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <button 
-                        onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'TASK_DETAIL', data: task } })}
-                        className="text-brand-600 hover:text-brand-700 text-sm font-bold"
-                      >
-                        详情
-                      </button>
+                      <div className="flex gap-2 flex-wrap">
+                        <button 
+                          onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'TASK_DETAIL', data: task } })}
+                          className="text-brand-600 hover:text-brand-700 text-sm font-bold"
+                        >
+                          详情
+                        </button>
+                        {task.status === '待派发' && (
+                          <button
+                            onClick={() => {
+                              dispatch({ type: 'SET_TASK_STATUS', payload: { id: task.id, status: '待接收', reason: '派发' } });
+                            }}
+                            className="text-green-600 hover:text-green-700 text-sm font-bold"
+                          >
+                            派发
+                          </button>
+                        )}
+                        {task.status === '待审批' && (
+                          <button
+                            onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'TASK_DETAIL', data: task } })}
+                            className="text-amber-600 hover:text-amber-700 text-sm font-bold"
+                          >
+                            任务审批
+                          </button>
+                        )}
+                        {task.suspendRequested && task.status === '执行中' && task.suspendReason && (
+                          <button
+                            onClick={() => {
+                              setTaskToAudit(task);
+                              setShowSuspendAuditModal(true);
+                            }}
+                            className="text-amber-600 hover:text-amber-700 text-sm font-bold"
+                          >
+                            暂停审批
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                   暂无任务数据
                 </td>
               </tr>
@@ -437,6 +590,53 @@ const TasksView = () => {
           </tbody>
         </table>
       </div>
+
+      {showSuspendAuditModal && taskToAudit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900">审核暂停申请</h3>
+              <button
+                onClick={() => {
+                  setShowSuspendAuditModal(false);
+                  setTaskToAudit(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-amber-50 rounded-xl p-4">
+                <p className="text-sm text-amber-700 font-medium mb-2">任务信息</p>
+                <p className="text-lg font-bold text-amber-900">{taskToAudit.name}</p>
+                <p className="text-sm text-amber-600 mt-1">{taskToAudit.date} {taskToAudit.startTime}-{taskToAudit.endTime}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">暂停申请原因</p>
+                <p className="text-slate-600 bg-slate-50 p-3 rounded-lg">{taskToAudit.suspendReason}</p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => handleAuditSuspend(false)}
+                  className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
+                >
+                  驳回
+                </button>
+                <button
+                  onClick={() => handleAuditSuspend(true)}
+                  className="flex-1 bg-amber-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-amber-600 transition-colors"
+                >
+                  同意暂停
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

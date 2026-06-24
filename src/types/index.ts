@@ -1,12 +1,24 @@
 export type ActivityPeriod = '筹备期' | '执行期' | '结束期';
 export type ActivityStatus = '筹备中' | '进行中' | '已结束';
-export type TaskStatus = '待派发' | '待接收' | '已接收' | '执行中' | '已完成' | '已取消' | '已拒绝';
+export type TaskStatus = '待审批' | '待派发' | '待接收' | '已接收' | '执行中' | '已暂停' | '已完成' | '已取消' | '已拒绝';
 export type ResourceStatus = '可调配' | '已调度' | '执行中' | '不可用';
 export type AuditStatus = '待审核' | '审核通过' | '审核不通过';
 export type VehicleType = '轿车' | 'SUV' | '商务车' | '中巴' | '大巴';
 export type LicenseType = 'A1' | 'A2' | 'A3' | 'B1' | 'B2' | 'C1' | 'C2';
 export type SupplierType = '租车公司' | '客运公司' | '个人车主' | '其他';
 export type SupplierStatus = '合作中' | '暂停合作' | '已终止';
+
+export interface WorkGroup {
+  id: string;
+  activityId: string;
+  location: string;
+  fieldManager?: string;
+  fieldManagerPhone?: string;
+  fieldDispatcher: string;
+  fieldDispatcherPhone: string;
+  pendingTaskCount: number;
+  createdAt: string;
+}
 
 export interface AuditRecord {
   id: string;
@@ -58,6 +70,7 @@ export interface Activity {
   vehicleIds: string[];
   driverIds: string[];
   supplierIds: string[];
+  workGroupIds: string[];
 }
 
 export interface Vehicle {
@@ -78,6 +91,8 @@ export interface Vehicle {
   auditRemark?: string;
   unavailableReason?: string;
   activityId?: string;
+  defaultDriverId?: string;
+  activityLocations: string[];
   auditMaterials: {
     vehiclePhotos: string[];
     inspectionCert: string[];
@@ -105,10 +120,13 @@ export interface Driver {
   auditRemark?: string;
   unavailableReason?: string;
   expectedReturnDate?: string;
+  privacyAgreementAccepted: boolean;
+  vehicleId?: string;
   auditMaterials: {
     licenseFront: string[];
     licenseBack: string[];
-    other: string[];
+    photos: string[];
+    otherQualifications: string[];
   };
 }
 
@@ -132,11 +150,15 @@ export interface Task {
   vehicleId?: string;
   driverId?: string;
   fieldDispatcher?: string;
+  fieldDispatcherPhone?: string;
   status: TaskStatus;
   rejectReason?: string;
   cancelReason?: string;
+  suspendReason?: string;
+  suspendRequested?: boolean;
   remark?: string;
   reachedLocations?: string[];
+  lastRemindTime?: string;
   history?: {
     status: TaskStatus;
     time: string;

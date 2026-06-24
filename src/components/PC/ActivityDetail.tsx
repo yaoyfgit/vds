@@ -20,11 +20,15 @@ import {
   Maximize2,
   Navigation,
   Map,
-  User
+  User,
+  Edit2,
+  Trash2,
+  Bell,
+  Briefcase
 } from 'lucide-react';
 import { cn, getTaskAbnormalRules } from '../../lib/utils';
-import { useApp } from '../../context/AppContext';
-import type { Activity, Vehicle, Driver, Task, ActivityPeriod, Supplier } from '../../types';
+import { useApp, generateId } from '../../context/AppContext';
+import type { Activity, Vehicle, Driver, Task, ActivityPeriod, Supplier, WorkGroup } from '../../types';
 
 interface ActivityDetailProps {
   activity: Activity;
@@ -39,13 +43,14 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({
   onNavigateToAudit,
   onNavigateToTasks
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'suppliers' | 'vehicles' | 'drivers' | 'tasks' | 'track'>('info');
-  const { tasks, vehicles, drivers, suppliers, dispatch } = useApp();
+  const [activeTab, setActiveTab] = useState<'info' | 'suppliers' | 'vehicles' | 'drivers' | 'workgroups' | 'tasks' | 'track'>('info');
+  const { tasks, vehicles, drivers, suppliers, workGroups, dispatch } = useApp();
 
   // 获取活动相关的数据
   const activityTasks = tasks.filter(t => t.activityId === activity.id);
   const activityVehicles = vehicles.filter(v => activity.vehicleIds.includes(v.id));
   const activityDrivers = drivers.filter(d => activity.driverIds.includes(d.id));
+  const activityWorkGroups = workGroups.filter(wg => wg.activityId === activity.id);
 
   // 打开任务详情
   const handleOpenTaskDetail = (task: Task) => {
@@ -131,6 +136,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({
     { id: 'suppliers', label: '关联供应商', icon: Building2 },
     { id: 'vehicles', label: '关联车辆', icon: Car },
     { id: 'drivers', label: '关联司机', icon: Users },
+    { id: 'workgroups', label: '工作小组', icon: Briefcase },
     { id: 'tasks', label: '任务列表', icon: ClipboardList },
     { id: 'track', label: '轨迹大屏', icon: LayoutDashboard },
   ];
@@ -214,6 +220,12 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({
           {activeTab === 'drivers' && (
             <ActivityDriversTab
               drivers={activityDrivers}
+              activity={activity}
+            />
+          )}
+          {activeTab === 'workgroups' && (
+            <ActivityWorkGroupsTab
+              workGroups={activityWorkGroups}
               activity={activity}
             />
           )}
@@ -507,6 +519,282 @@ const ActivityDriversTab: React.FC<{
   );
 };
 
+// 工作小组Tab
+const ActivityWorkGroupsTab: React.FC<{
+  workGroups: WorkGroup[];
+  activity: Activity;
+}> = ({ workGroups, activity }) => {
+  const { dispatch } = useApp();
+  const [showModal, setShowModal] = useState(false);
+  const [editingWorkGroup, setEditingWorkGroup] = useState<WorkGroup | null>(null);
+  const [formData, setFormData] = useState({
+    location: '',
+    fieldManager: '',
+    fieldManagerPhone: '',
+    fieldDispatcher: '',
+    fieldDispatcherPhone: ''
+  });
+
+  const handleOpenModal = (workGroup?: WorkGroup) => {
+    if (workGroup) {
+      setEditingWorkGroup(workGroup);
+      setFormData({
+        location: workGroup.location,
+        fieldManager: workGroup.fieldManager || '',
+        fieldManagerPhone: workGroup.fieldManagerPhone || '',
+        fieldDispatcher: workGroup.fieldDispatcher,
+        fieldDispatcherPhone: workGroup.fieldDispatcherPhone
+      });
+    } else {
+      setEditingWorkGroup(null);
+      setFormData({
+        location: '',
+        fieldManager: '',
+        fieldManagerPhone: '',
+        fieldDispatcher: '',
+        fieldDispatcherPhone: ''
+      });
+    }
+    setShowModal(true);
+  };
+
+  const handleSave = () => {
+    if (!formData.location || !formData.fieldDispatcher || !formData.fieldDispatcherPhone) {
+      alert('请填写必填项（地点、现场调度员、调度员电话）');
+      return;
+    }
+
+    if (editingWorkGroup) {
+      dispatch({
+        type: 'UPDATE_WORK_GROUP',
+        payload: {
+          id: editingWorkGroup.id,
+          data: {
+            location: formData.location,
+            fieldManager: formData.fieldManager || undefined,
+            fieldManagerPhone: formData.fieldManagerPhone || undefined,
+            fieldDispatcher: formData.fieldDispatcher,
+            fieldDispatcherPhone: formData.fieldDispatcherPhone
+          }
+        }
+      });
+    } else {
+      dispatch({
+        type: 'ADD_WORK_GROUP',
+        payload: {
+          id: generateId(),
+          activityId: activity.id,
+          location: formData.location,
+          fieldManager: formData.fieldManager || undefined,
+          fieldManagerPhone: formData.fieldManagerPhone || undefined,
+          fieldDispatcher: formData.fieldDispatcher,
+          fieldDispatcherPhone: formData.fieldDispatcherPhone,
+          pendingTaskCount: 0,
+          createdAt: new Date().toISOString().split('T')[0]
+        }
+      });
+    }
+
+    setShowModal(false);
+  };
+
+  const handleDelete = (workGroup: WorkGroup) => {
+    if (workGroup.pendingTaskCount > 0) {
+      alert(`该工作小组有 ${workGroup.pendingTaskCount} 个待完成任务，无法删除`);
+      return;
+    }
+
+    if (confirm('确认删除该工作小组？')) {
+      dispatch({
+        type: 'DELETE_WORK_GROUP',
+        payload: { id: workGroup.id }
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-slate-900">工作小组 ({workGroups.length})</h3>
+        {activity.period !== '结束期' && (
+          <button
+            onClick={() => handleOpenModal()}
+            className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+          >
+            <Plus size={16} />
+            新建工作小组
+          </button>
+        )}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <th className="px-4 py-3">活动地点</th>
+              <th className="px-4 py-3">现场负责人</th>
+              <th className="px-4 py-3">现场调度员</th>
+              <th className="px-4 py-3">待完成任务数</th>
+              <th className="px-4 py-3">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {workGroups.length > 0 ? workGroups.map(wg => (
+              <tr key={wg.id} className="hover:bg-slate-50/50 transition-colors">
+                <td className="px-4 py-3 font-semibold text-slate-900">{wg.location}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  <div>{wg.fieldManager || '-'}</div>
+                  {wg.fieldManagerPhone && (
+                    <div className="text-xs text-slate-400">{wg.fieldManagerPhone}</div>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  <div>{wg.fieldDispatcher}</div>
+                  <div className="text-xs text-slate-400">{wg.fieldDispatcherPhone}</div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={cn(
+                    'px-2 py-1 rounded-full text-xs font-medium',
+                    wg.pendingTaskCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                  )}>
+                    {wg.pendingTaskCount}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    {activity.period !== '结束期' && (
+                      <>
+                        <button
+                          onClick={() => handleOpenModal(wg)}
+                          className="text-blue-600 text-sm font-medium hover:text-blue-700 flex items-center gap-1"
+                        >
+                          <Edit2 size={14} />
+                          编辑
+                        </button>
+                        <button
+                          onClick={() => handleDelete(wg)}
+                          className="text-red-600 text-sm font-medium hover:text-red-700 flex items-center gap-1"
+                        >
+                          <Trash2 size={14} />
+                          删除
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  暂无工作小组
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 新建/编辑工作小组弹窗 */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-[500px] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold">
+                {editingWorkGroup ? '编辑工作小组' : '新建工作小组'}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  活动地点 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
+                  placeholder="请输入活动地点"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  现场负责人
+                </label>
+                <input
+                  type="text"
+                  value={formData.fieldManager}
+                  onChange={(e) => setFormData({ ...formData, fieldManager: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
+                  placeholder="请输入现场负责人姓名"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  负责人电话
+                </label>
+                <input
+                  type="text"
+                  value={formData.fieldManagerPhone}
+                  onChange={(e) => setFormData({ ...formData, fieldManagerPhone: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
+                  placeholder="请输入负责人电话"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  现场调度员 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.fieldDispatcher}
+                  onChange={(e) => setFormData({ ...formData, fieldDispatcher: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
+                  placeholder="请输入现场调度员姓名"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  调度员电话 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.fieldDispatcherPhone}
+                  onChange={(e) => setFormData({ ...formData, fieldDispatcherPhone: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
+                  placeholder="请输入调度员电话"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-6 border-t border-slate-200">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // 任务列表Tab
 const ActivityTasksTab: React.FC<{
   tasks: Task[];
@@ -516,6 +804,7 @@ const ActivityTasksTab: React.FC<{
   onOpenTaskDetail?: (task: Task) => void;
   onOpenNewTask?: () => void;
 }> = ({ tasks, vehicles, drivers, activity, onOpenTaskDetail, onOpenNewTask }) => {
+  const { dispatch } = useApp();
   const [filterStatus, setFilterStatus] = useState<string>('');
 
   const filteredTasks = tasks.filter(task => {
@@ -531,6 +820,17 @@ const ActivityTasksTab: React.FC<{
     '已完成': 'bg-slate-100 text-slate-600',
     '已取消': 'bg-slate-100 text-slate-500',
     '已拒绝': 'bg-red-100 text-red-700',
+    '待审批': 'bg-yellow-100 text-yellow-700',
+    '已暂停': 'bg-orange-100 text-orange-700',
+  };
+
+  const getStatusCount = (status: string) => {
+    return tasks.filter(t => t.status === status).length;
+  };
+
+  const handleRemindTask = (task: Task) => {
+    dispatch({ type: 'REMIND_TASK', payload: { id: task.id } });
+    alert('已发送提醒');
   };
 
   return (
@@ -553,22 +853,36 @@ const ActivityTasksTab: React.FC<{
         <button
           onClick={() => setFilterStatus('')}
           className={cn(
-            'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+            'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors relative',
             filterStatus === '' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           )}
         >
           全部
+          <span className={cn(
+            'absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] flex items-center justify-center',
+            filterStatus === '' ? 'bg-red-500 text-white' : 'bg-brand-500 text-white'
+          )}>
+            {tasks.length}
+          </span>
         </button>
-        {['待派发', '待接收', '已接收', '执行中', '已完成', '已取消', '已拒绝'].map(status => (
+        {['待派发', '待审批', '待接收', '已接收', '执行中', '已暂停', '已完成', '已取消', '已拒绝'].map(status => (
           <button
             key={status}
             onClick={() => setFilterStatus(status)}
             className={cn(
-              'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+              'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors relative',
               filterStatus === status ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             )}
           >
             {status}
+            {getStatusCount(status) > 0 && (
+              <span className={cn(
+                'absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] flex items-center justify-center',
+                filterStatus === status ? 'bg-red-500 text-white' : 'bg-brand-500 text-white'
+              )}>
+                {getStatusCount(status)}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -615,7 +929,7 @@ const ActivityTasksTab: React.FC<{
                     <div className="text-xs text-slate-400">{vehicle?.plateNumber || '未分配'}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium', statusStyles[task.status])}>
+                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium', statusStyles[task.status] || 'bg-slate-100 text-slate-600')}>
                       {task.status}
                     </span>
                   </td>
@@ -630,6 +944,15 @@ const ActivityTasksTab: React.FC<{
                       {activity.period === '执行期' && task.status === '待派发' && task.vehicleId && task.driverId && (
                         <button className="text-green-600 text-sm font-medium hover:text-green-700">
                           派发
+                        </button>
+                      )}
+                      {task.status === '待接收' && (
+                        <button
+                          onClick={() => handleRemindTask(task)}
+                          className="text-amber-600 text-sm font-medium hover:text-amber-700 flex items-center gap-1"
+                        >
+                          <Bell size={14} />
+                          提醒接收
                         </button>
                       )}
                     </div>
