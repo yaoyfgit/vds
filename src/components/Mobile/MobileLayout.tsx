@@ -6,11 +6,8 @@ import {
   CheckCircle2,
   Play,
   XCircle,
-  Users,
   History,
   ArrowLeft,
-  Clock,
-  Phone,
   MapPin,
   AlertCircle,
   Pause,
@@ -19,7 +16,7 @@ import {
   Check,
   Flag
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, getTaskAbnormalRules, getAbnormalColor } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import DispatcherView from './DispatcherView';
 import type { Task } from '../../types';
@@ -225,40 +222,61 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
             <p className="text-slate-500 text-sm">暂无历史任务</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {tasks.filter(t => ['已完成', '已拒绝'].includes(t.status)).map(task => (
-              <div key={task.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "w-2 h-2 rounded-full",
-                      task.status === '已完成' ? "bg-green-500" : "bg-orange-500"
-                    )} />
-                    <span className="text-xs font-bold text-slate-600">{task.status}</span>
+          <div className="space-y-2">
+            {tasks.filter(t => ['已完成', '已拒绝'].includes(t.status)).map(task => {
+              const abnormalRules = getTaskAbnormalRules(task);
+              const abnormalColor = abnormalRules.length > 0 ? getAbnormalColor(abnormalRules[0].code) : null;
+              return (
+                <div 
+                  key={task.id} 
+                  className={cn(
+                    "bg-white rounded-xl p-4 border cursor-pointer hover:shadow-sm transition-all",
+                    abnormalColor ? abnormalColor.border : "border-slate-100",
+                    abnormalColor ? "shadow-md" : ""
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-xs font-medium",
+                        task.status === '已完成' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      )}>
+                        {task.status}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {task.date === new Date().toISOString().split('T')[0] ? '今日' : task.date}
+                      </span>
+                      <span className="text-xs text-slate-400">{task.startTime}-{task.endTime}</span>
+                    </div>
+                    <ChevronRight size={16} className="text-slate-300" />
                   </div>
-                  <span className="text-xs text-slate-400">{task.date}</span>
-                </div>
-                
-                <h3 className="font-bold text-slate-900 mb-2 truncate">{task.name}</h3>
-                
-                <div className="flex items-center gap-4 text-xs text-slate-500">
-                  <div className="flex items-center gap-1">
-                    <Clock size={12} />
-                    <span>{task.startTime}-{task.endTime}</span>
+                  
+                  <h3 className="font-semibold text-slate-900 mb-2">{task.name}</h3>
+                  
+                  {/* 简化的横向时间轴 */}
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <MapPin size={12} className="text-green-500" />
+                    <span className="truncate max-w-[80px]">{task.from}</span>
+                    {task.waypoints && task.waypoints.length > 0 && (
+                      <>
+                        <span>→</span>
+                        <span className="text-brand-500">{task.waypoints.length}个途经</span>
+                        <span>→</span>
+                      </>
+                    )}
+                    {!task.waypoints || task.waypoints.length === 0 && <span>→</span>}
+                    <MapPin size={12} className="text-red-500" />
+                    <span className="truncate max-w-[80px]">{task.to}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <MapPin size={12} />
-                    <span className="truncate">{task.from}→{task.to}</span>
-                  </div>
-                </div>
 
-                {task.rejectReason && (
-                  <div className="mt-3 bg-orange-50 rounded-lg p-2">
-                    <p className="text-xs text-orange-700">拒绝原因：{task.rejectReason}</p>
-                  </div>
-                )}
-              </div>
-            ))}
+                  {task.rejectReason && (
+                    <div className="mt-3 bg-orange-50 rounded-lg p-2">
+                      <p className="text-xs text-orange-700">拒绝原因：{task.rejectReason}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -295,7 +313,10 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                 {selectedTask.suspendRequested && selectedTask.status === '执行中' ? '暂停审核中' : selectedTask.status}
               </span>
             </div>
-            <span className="text-xs text-slate-400">{selectedTask.date}</span>
+            <div className="text-right">
+              <span className="text-xs text-slate-400">{selectedTask.date}</span>
+              <span className="text-xs text-slate-400 ml-1">{selectedTask.startTime}-{selectedTask.endTime}</span>
+            </div>
           </div>
           
           <h3 className="text-xl font-bold text-slate-900 mb-4">{selectedTask.name}</h3>
@@ -320,12 +341,14 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                     (selectedTask.reachedLocations || []).includes(selectedTask.from) ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
                   )}
                 >
-                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">出发地</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">出发地</span>
+                    {selectedTask.fromTime && <span className="text-[10px] text-slate-400">{selectedTask.fromTime}</span>}
+                  </div>
                   <p className={cn(
                     "text-sm font-medium",
                     (selectedTask.reachedLocations || []).includes(selectedTask.from) ? "text-slate-400 line-through" : "text-slate-800"
                   )}>{selectedTask.from}</p>
-                  {selectedTask.fromTime && <p className="text-xs text-slate-400">{selectedTask.fromTime}</p>}
                 </div>
                 
                 {/* 途经点 */}
@@ -343,12 +366,14 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                           (selectedTask.reachedLocations || []).includes(waypoint.name) ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
                         )}
                       >
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">途经点 {index + 1}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">途经点 {index + 1}</span>
+                          {waypoint.time && <span className="text-[10px] text-slate-400">{waypoint.time}</span>}
+                        </div>
                         <p className={cn(
                           "text-sm font-medium",
                           (selectedTask.reachedLocations || []).includes(waypoint.name) ? "text-slate-400 line-through" : "text-slate-800"
                         )}>{waypoint.name}</p>
-                        {waypoint.time && <p className="text-xs text-slate-400">{waypoint.time}</p>}
                       </div>
                     ))}
                   </div>
@@ -364,79 +389,47 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                     (selectedTask.reachedLocations || []).includes(selectedTask.to) ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
                   )}
                 >
-                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">目的地</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">目的地</span>
+                    {selectedTask.toTime && <span className="text-[10px] text-slate-400">{selectedTask.toTime}</span>}
+                  </div>
                   <p className={cn(
                     "text-sm font-medium",
                     (selectedTask.reachedLocations || []).includes(selectedTask.to) ? "text-slate-400 line-through" : "text-slate-800"
                   )}>{selectedTask.to}</p>
-                  {selectedTask.toTime && <p className="text-xs text-slate-400">{selectedTask.toTime}</p>}
                 </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gradient-to-br from-brand-50 to-blue-50 rounded-xl p-3">
-                <p className="text-[10px] text-brand-600 uppercase font-bold tracking-wider mb-1">开始时间</p>
-                <p className="text-sm font-bold text-slate-900">{selectedTask.startTime}</p>
-              </div>
-              <div className="bg-gradient-to-br from-brand-50 to-blue-50 rounded-xl p-3">
-                <p className="text-[10px] text-brand-600 uppercase font-bold tracking-wider mb-1">结束时间</p>
-                <p className="text-sm font-bold text-slate-900">{selectedTask.endTime}</p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="bg-slate-50 rounded-xl p-3 space-y-2">
               {selectedTask.passenger && (
-                <div className="flex items-center gap-3 text-slate-600">
-                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-                    <Users size={14} className="text-slate-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">乘客</p>
-                    <p className="text-sm font-medium">{selectedTask.passenger}</p>
-                  </div>
-                </div>
-              )}
-              {selectedTask.passengerPhone && (
-                <div className="flex items-center gap-3 text-slate-600">
-                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-                    <Phone size={14} className="text-slate-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">联系电话</p>
-                    <p className="text-sm font-medium">{selectedTask.passengerPhone}</p>
-                  </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">乘客</span>
+                  <span className="text-slate-800 font-medium">{selectedTask.passenger}</span>
                 </div>
               )}
               {selectedTask.passengerCount && (
-                <div className="flex items-center gap-3 text-slate-600">
-                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-                    <Users size={14} className="text-slate-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">人数</p>
-                    <p className="text-sm font-medium">{selectedTask.passengerCount}人</p>
-                  </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">人数</span>
+                  <span className="text-slate-800 font-medium">{selectedTask.passengerCount}人</span>
                 </div>
               )}
-              {(selectedTask.fieldDispatcher || selectedTask.fieldDispatcherPhone) && (
-                <div className="flex items-center gap-3 text-slate-600">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Phone size={14} className="text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">调度员</p>
-                    <p className="text-sm font-medium">{selectedTask.fieldDispatcher || '-'}</p>
-                    {selectedTask.fieldDispatcherPhone && (
-                      <a 
-                        href={`tel:${selectedTask.fieldDispatcherPhone}`} 
-                        className="text-xs text-blue-600 flex items-center gap-1 mt-0.5"
-                      >
-                        <Phone size={12} />
-                        {selectedTask.fieldDispatcherPhone}
-                      </a>
-                    )}
-                  </div>
+              {selectedTask.passengerPhone && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">联系电话</span>
+                  <span className="text-slate-800 font-medium">{selectedTask.passengerPhone}</span>
+                </div>
+              )}
+              {selectedTask.fieldDispatcher && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">现场调度员</span>
+                  <span className="text-slate-800 font-medium">{selectedTask.fieldDispatcher}</span>
+                </div>
+              )}
+              {selectedTask.fieldDispatcherPhone && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">调度员电话</span>
+                  <a href={`tel:${selectedTask.fieldDispatcherPhone}`} className="text-blue-600 font-medium">{selectedTask.fieldDispatcherPhone}</a>
                 </div>
               )}
             </div>
@@ -669,13 +662,26 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
             const priorityTask = displayTasks[0];
             const otherTasks = displayTasks.slice(1);
             
+            // 获取首要任务的异常边框样式（渐变背景卡片使用边框）
+            const getAbnormalColorForPriority = (task: Task) => {
+              const abnormalRules = getTaskAbnormalRules(task);
+              if (abnormalRules.length > 0) {
+                const color = getAbnormalColor(abnormalRules[0].code);
+                return `border-2 ${color.border}`;
+              }
+              return 'shadow-brand-200';
+            };
+            
             return (
               <>
                 {/* 首要任务卡片 - 品牌色主题，展示完整行程 */}
                 {priorityTask && (
                   <div 
                     onClick={() => setSelectedTask(priorityTask)}
-                    className="bg-gradient-to-br from-brand-600 to-brand-700 rounded-2xl p-5 text-white cursor-pointer hover:scale-[1.02] transition-all shadow-lg shadow-brand-200"
+                    className={cn(
+                      "bg-gradient-to-br from-brand-600 to-brand-700 rounded-2xl p-5 text-white cursor-pointer hover:scale-[1.02] transition-all shadow-lg",
+                      getAbnormalColorForPriority(priorityTask)
+                    )}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -796,12 +802,19 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                     )}
                     
                     <div className="space-y-2">
-                      {otherTasks.map(task => (
-                        <div 
-                          key={task.id}
-                          onClick={() => setSelectedTask(task)}
-                          className="bg-white rounded-xl p-4 border border-slate-100 cursor-pointer hover:border-brand-200 hover:shadow-sm transition-all"
-                        >
+                      {otherTasks.map(task => {
+                        const abnormalRules = getTaskAbnormalRules(task);
+                        const abnormalColor = abnormalRules.length > 0 ? getAbnormalColor(abnormalRules[0].code) : null;
+                        return (
+                          <div 
+                            key={task.id}
+                            onClick={() => setSelectedTask(task)}
+                            className={cn(
+                              "bg-white rounded-xl p-4 border cursor-pointer hover:shadow-sm transition-all",
+                              abnormalColor ? abnormalColor.border : "border-slate-100",
+                              abnormalColor ? "shadow-md" : ""
+                            )}
+                          >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className={cn(
@@ -812,7 +825,10 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                               )}>
                                 {task.status}
                               </span>
-                              <span className="text-xs text-slate-400">{task.date}</span>
+                              <span className="text-xs text-slate-400">
+                                {task.date === new Date().toISOString().split('T')[0] ? '今日' : task.date}
+                              </span>
+                              <span className="text-xs text-slate-400">{task.startTime}-{task.endTime}</span>
                             </div>
                             <ChevronRight size={16} className="text-slate-300" />
                           </div>
@@ -835,7 +851,8 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                             <span className="truncate max-w-[80px]">{task.to}</span>
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
                     </div>
                   </div>
                 )}

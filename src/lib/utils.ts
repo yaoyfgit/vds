@@ -87,3 +87,34 @@ export function getTaskAbnormalRules(task: Task): AbnormalRule[] {
 export function isTaskAbnormal(task: Task): boolean {
   return getTaskAbnormalRules(task).length > 0;
 }
+
+// 获取异常类型对应的颜色
+export function getAbnormalColor(code: string): { bg: string; border: string; text: string; labelBg: string; labelText: string } {
+  const redColors = ['E1', 'E2', 'E6'];
+  const yellowColors = ['E3', 'E4', 'E5'];
+  
+  if (redColors.includes(code)) {
+    return {
+      bg: 'bg-red-50',
+      border: 'border-red-500',
+      text: 'text-red-700',
+      labelBg: 'bg-red-100',
+      labelText: 'text-red-600'
+    };
+  } else if (yellowColors.includes(code)) {
+    return {
+      bg: 'bg-amber-50',
+      border: 'border-amber-500',
+      text: 'text-amber-700',
+      labelBg: 'bg-amber-100',
+      labelText: 'text-amber-600'
+    };
+  }
+  return {
+    bg: 'bg-slate-50',
+    border: 'border-slate-300',
+    text: 'text-slate-700',
+    labelBg: 'bg-slate-100',
+    labelText: 'text-slate-600'
+  };
+}

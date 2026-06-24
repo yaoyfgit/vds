@@ -22,7 +22,7 @@ import {
   MapPin,
   Check
 } from 'lucide-react';
-import { cn, isTaskAbnormal, getTaskAbnormalRules } from '../../lib/utils';
+import { cn, isTaskAbnormal, getTaskAbnormalRules, getAbnormalColor } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import ActivityDetail from './ActivityDetail';
 import { SuppliersView } from './SupplierDetail';
@@ -259,7 +259,7 @@ const ActivitiesView: React.FC<{
                   <span>{activity.location}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-20 text-slate-400">负责人:</span>
+                  <span className="w-20 text-slate-400">总调度员:</span>
                   <span>{activity.managers.join('、')}</span>
                 </div>
               </div>
@@ -534,11 +534,13 @@ const TasksView = () => {
                 const driver = drivers.find(d => d.id === task.driverId);
                 const activity = activities.find(a => a.id === task.activityId);
                 const isAbnormal = isTaskAbnormal(task);
+                const abnormalRules = getTaskAbnormalRules(task);
+                const abnormalColor = abnormalRules.length > 0 ? getAbnormalColor(abnormalRules[0].code) : null;
                 const isSelected = selectedTasks.some(t => t.id === task.id);
                 return (
                   <tr key={task.id} className={cn(
                     "hover:bg-slate-50/50 transition-colors",
-                    isAbnormal && "bg-red-50",
+                    abnormalColor?.bg,
                     isSelected && "bg-brand-50/50"
                   )}>
                     <td className="px-4 py-4">
@@ -560,11 +562,18 @@ const TasksView = () => {
                       <div className="text-xs text-slate-400">{activity?.name || '未关联活动'}</div>
                       {isAbnormal && (
                         <div className="flex gap-1 mt-1">
-                          {getTaskAbnormalRules(task).map(rule => (
-                            <span key={rule.code} className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">
-                              {rule.code}
-                            </span>
-                          ))}
+                          {abnormalRules.map(rule => {
+                            const color = getAbnormalColor(rule.code);
+                            return (
+                              <span key={rule.code} className={cn(
+                                "text-[10px] px-1.5 py-0.5 rounded",
+                                color.labelBg,
+                                color.labelText
+                              )}>
+                                {rule.code}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                     </td>

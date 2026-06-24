@@ -1,5 +1,15 @@
 import type { Activity, Vehicle, Driver, Task, Supplier, AuditRecord, WorkGroup } from '../types';
 
+// 系统账号列表（用于模糊搜索）
+export const systemAccounts = [
+  { name: '调度员-陈某', phone: '13800001111' },
+  { name: '调度员-李某', phone: '13800002222' },
+  { name: '调度员-王某', phone: '13800003333' },
+  { name: '调度员-赵某', phone: '13800004444' },
+  { name: '调度员-刘某', phone: '13800005555' },
+  { name: '管理员-张总', phone: '13900001111' },
+];
+
 export const workGroups: WorkGroup[] = [
   {
     id: 'wg-1',

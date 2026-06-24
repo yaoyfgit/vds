@@ -296,7 +296,7 @@ const ActivityInfoTab: React.FC<{
           </div>
           <div className="flex items-center gap-2">
             <Users size={16} className="text-slate-400" />
-            <span className="text-slate-500">负责人：</span>
+            <span className="text-slate-500">总调度员：</span>
             <span className="text-slate-900 font-medium">{activity.managers.join('、')}</span>
           </div>
           <div className="flex items-center gap-2">

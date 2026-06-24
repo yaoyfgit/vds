@@ -23,6 +23,7 @@ import {
   Image,
   FileText,
   CreditCard,
+  XCircle,
 } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
 import PCLayout from './components/PC/PCLayout';
@@ -32,6 +33,7 @@ import VehicleDetail from './components/PC/VehicleDetail';
 import DriverDetail from './components/PC/DriverDetail';
 import { generateId, cn, getTaskAbnormalRules } from './lib/utils';
 import type { Task, Vehicle, Driver, Activity, Supplier, ActivityStatus, ActivityPeriod, ResourceStatus, TaskStatus, AuditStatus, SupplierStatus } from './types';
+import { systemAccounts } from './data/mockData';
 
 // Main App Component
 export default function App() {
@@ -92,6 +94,54 @@ function PCApp() {
   const [otherSupplierFiles, setOtherSupplierFiles] = useState<string[]>([]);
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string>('');
   const [vehicleCapacityFilter, setVehicleCapacityFilter] = useState<string>('');
+  const [activityManagers, setActivityManagers] = useState<string[]>([]);
+  const [managerSearchQuery, setManagerSearchQuery] = useState('');
+  const [showManagerSearch, setShowManagerSearch] = useState(false);
+  const [managerSearchResults, setManagerSearchResults] = useState<{name: string, phone: string}[]>([]);
+
+  // 搜索总调度员
+  const handleManagerSearch = (query: string) => {
+    setManagerSearchQuery(query);
+    
+    if (!query.trim()) {
+      setManagerSearchResults([]);
+      setShowManagerSearch(false);
+      return;
+    }
+
+    const results = systemAccounts
+      .filter(account => 
+        account.name.includes(query) || 
+        account.phone.includes(query)
+      )
+      .map(account => ({ name: account.name, phone: account.phone }))
+      .slice(0, 5);
+
+    setManagerSearchResults(results);
+    setShowManagerSearch(results.length > 0);
+  };
+
+  // 选择总调度员
+  const handleSelectManager = (result: { name: string; phone: string }) => {
+    if (!activityManagers.includes(result.name)) {
+      setActivityManagers([...activityManagers, result.name]);
+    }
+    setShowManagerSearch(false);
+    setManagerSearchQuery('');
+    setManagerSearchResults([]);
+  };
+
+  // 删除总调度员
+  const handleRemoveManager = (name: string) => {
+    setActivityManagers(activityManagers.filter(m => m !== name));
+  };
+
+  // 初始化编辑活动的总调度员
+  React.useEffect(() => {
+    if (activeModal === 'EDIT_ACTIVITY' && modalData?.managers) {
+      setActivityManagers(modalData.managers);
+    }
+  }, [activeModal, modalData]);
 
   const handleClose = () => {
     dispatch({ type: 'CLOSE_MODAL' });
@@ -112,6 +162,10 @@ function PCApp() {
     setQualificationFiles([]);
     setOtherSupplierFiles([]);
     setCancelReason('');
+    setActivityManagers([]);
+    setManagerSearchQuery('');
+    setShowManagerSearch(false);
+    setManagerSearchResults([]);
     setSelectedActivityId('');
     setVehicleTypeFilter('');
     setVehicleCapacityFilter('');
@@ -209,13 +263,29 @@ function PCApp() {
         description: formData.description || '',
         status: '筹备中' as ActivityStatus,
         period: '筹备期' as ActivityPeriod,
-        managers: ['调度员-陈某'],
+        managers: activityManagers.length > 0 ? activityManagers : ['调度员-陈某'],
         vehicleIds: selectedVehicles,
         driverIds: selectedDrivers,
         supplierIds: [],
         workGroupIds: []
       };
       dispatch({ type: 'ADD_ACTIVITY', payload: newActivity });
+      handleClose();
+    } else if (activeModal === 'EDIT_ACTIVITY') {
+      dispatch({
+        type: 'UPDATE_ACTIVITY',
+        payload: {
+          id: modalData.id,
+          data: {
+            name: formData.name,
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+            location: formData.location,
+            description: formData.description,
+            managers: activityManagers
+          }
+        }
+      });
       handleClose();
     } else if (activeModal === 'NEW_VEHICLE') {
       const existingVehicle = vehicles.find(v => v.plateNumber === formData.plateNumber);
@@ -597,6 +667,54 @@ function PCApp() {
               className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
               placeholder="活动举办地点"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">总调度员</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={managerSearchQuery}
+                onChange={(e) => handleManagerSearch(e.target.value)}
+                onFocus={() => {
+                  if (managerSearchQuery) handleManagerSearch(managerSearchQuery);
+                }}
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                placeholder="输入姓名或电话搜索系统账号"
+              />
+              {showManagerSearch && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {managerSearchResults.map((result, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSelectManager(result)}
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                    >
+                      <div className="font-medium text-slate-900">{result.name}</div>
+                      <div className="text-xs text-slate-500">{result.phone}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {activityManagers.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {activityManagers.map((manager, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-brand-50 text-brand-700 rounded-full text-sm"
+                  >
+                    {manager}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveManager(manager)}
+                      className="hover:text-brand-900"
+                    >
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">活动描述</label>
@@ -1815,12 +1933,12 @@ function PCApp() {
             </div>
           )}
           
-          {/* 基本信息 */}
+          {/* 任务信息 */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
               <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
                 <FileText size={16} className="text-brand-600" />
-                基本信息
+                任务信息
               </h4>
             </div>
             <div className="p-4 space-y-4">
@@ -1854,16 +1972,6 @@ function PCApp() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">任务日期 <span className="text-red-500">*</span></label>
-                  <input
-                    type="date"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : ''}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                    required
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">现场调度员 <span className="text-red-500">*</span></label>
                   <select
                     defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fieldDispatcher : '当前用户'}
@@ -1877,15 +1985,47 @@ function PCApp() {
                     <option value="王某">王某</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">乘车人数</label>
+                  <input
+                    type="number"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerCount : ''}
+                    onChange={(e) => setFormData({ ...formData, passengerCount: parseInt(e.target.value) || 0 })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                    placeholder="乘车人数"
+                    min="1"
+                  />
+                </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              {/* 跨天任务支持 */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">开始日期 <span className="text-red-500">*</span></label>
+                  <input
+                    type="date"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : ''}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                    required
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">开始时间 <span className="text-red-500">*</span></label>
                   <input
                     type="time"
                     defaultValue={activeModal === 'EDIT_TASK' ? modalData?.startTime : ''}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">结束日期 <span className="text-red-500">*</span></label>
+                  <input
+                    type="date"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : ''}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                     required
                   />
@@ -1900,6 +2040,38 @@ function PCApp() {
                     required
                   />
                 </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">乘车人</label>
+                  <input
+                    type="text"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passenger : ''}
+                    onChange={(e) => setFormData({ ...formData, passenger: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">联系电话</label>
+                  <input
+                    type="tel"
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerPhone : ''}
+                    onChange={(e) => setFormData({ ...formData, passengerPhone: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">任务描述</label>
+                <textarea
+                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.description : ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none resize-none"
+                  placeholder="特殊要求、注意事项等"
+                />
               </div>
             </div>
           </div>
@@ -2032,49 +2204,6 @@ function PCApp() {
             </div>
           </div>
           
-          {/* 乘车人信息 */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-              <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
-                <Users size={16} className="text-brand-600" />
-                乘车人信息
-              </h4>
-            </div>
-            <div className="p-4">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">乘车人</label>
-                  <input
-                    type="text"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passenger : ''}
-                    onChange={(e) => setFormData({ ...formData, passenger: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">联系电话</label>
-                  <input
-                    type="tel"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerPhone : ''}
-                    onChange={(e) => setFormData({ ...formData, passengerPhone: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">乘车人数</label>
-                <input
-                  type="number"
-                  min="1"
-                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerCount : ''}
-                  onChange={(e) => setFormData({ ...formData, passengerCount: parseInt(e.target.value) })}
-                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                  placeholder="用于匹配车辆座位数"
-                />
-              </div>
-            </div>
-          </div>
-          
           {/* 资源分配 */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
@@ -2198,25 +2327,6 @@ function PCApp() {
             </div>
           </div>
 
-          {/* 任务描述 */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-              <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
-                <FileText size={16} className="text-brand-600" />
-                备注信息
-              </h4>
-            </div>
-            <div className="p-4">
-              <textarea
-                defaultValue={activeModal === 'EDIT_TASK' ? modalData?.description : ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none resize-none"
-                placeholder="特殊要求、注意事项等"
-              />
-            </div>
-          </div>
-
           <button type="submit" className="w-full bg-brand-600 text-white py-3.5 rounded-xl font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2">
             <CheckCircle2 size={20} />
             {activeModal === 'NEW_TASK' ? '创建任务' : '保存修改'}
@@ -2272,14 +2382,6 @@ function PCApp() {
                   "bg-slate-400 text-slate-900"
                 )}>{modalData.status || '未知'}</span>
               </div>
-              <div className="flex items-center gap-4 text-white/70 text-sm">
-                <span className="flex items-center gap-1">
-                  <MapPin size={14} />
-                  {modalData.from}
-                </span>
-                <ChevronRight size={14} />
-                <span>{modalData.to}</span>
-              </div>
             </div>
 
             {/* 行程信息 */}
@@ -2295,9 +2397,11 @@ function PCApp() {
                       <MapPin size={18} className="text-green-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400 mb-0.5">出发地</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 font-medium">出发地</span>
+                        {modalData.fromTime && <span className="text-xs text-slate-500">{modalData.fromTime}</span>}
+                      </div>
                       <p className="font-medium text-slate-900">{modalData.from || '未设置'}</p>
-                      {modalData.fromTime && <p className="text-xs text-slate-500">{modalData.fromTime}</p>}
                     </div>
                   </div>
                   
@@ -2314,9 +2418,11 @@ function PCApp() {
                               <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
                             </div>
                             <div>
-                              <p className="text-xs text-slate-400 mb-0.5">途经点{index + 1}</p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-400 font-medium">途经点{index + 1}</span>
+                                {waypoint.time && <span className="text-xs text-slate-500">{waypoint.time}</span>}
+                              </div>
                               <p className="font-medium text-slate-900 text-sm">{waypoint.name}</p>
-                              {waypoint.time && <p className="text-xs text-slate-500">{waypoint.time}</p>}
                             </div>
                             {index < modalData.waypoints.length - 1 && (
                               <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
@@ -2334,9 +2440,11 @@ function PCApp() {
                       <MapPin size={18} className="text-red-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400 mb-0.5">目的地</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 font-medium">目的地</span>
+                        {modalData.toTime && <span className="text-xs text-slate-500">{modalData.toTime}</span>}
+                      </div>
                       <p className="font-medium text-slate-900">{modalData.to || '未设置'}</p>
-                      {modalData.toTime && <p className="text-xs text-slate-500">{modalData.toTime}</p>}
                     </div>
                   </div>
                 </div>
@@ -2668,6 +2776,46 @@ function PCApp() {
                   <CheckCircle2 size={16} />
                   下发任务
                 </button>
+              )}
+
+              {modalData.status === '待审批' && (
+                <>
+                  {!modalData.vehicleId || !modalData.driverId ? (
+                    <button 
+                      onClick={() => {
+                        setFormData({ vehicleId: modalData.vehicleId, driverId: modalData.driverId });
+                        dispatch({ type: 'OPEN_MODAL', payload: { type: 'ASSIGN_RESOURCE', data: modalData } });
+                      }}
+                      className="px-4 py-2 bg-brand-50 text-brand-700 rounded-lg hover:bg-brand-100 transition-colors text-sm font-medium flex items-center gap-2"
+                    >
+                      <Users size={16} />
+                      分配资源
+                    </button>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => {
+                          dispatch({ type: 'SET_TASK_STATUS', payload: { id: modalData.id, status: '待派发', reason: '审批通过' } });
+                          handleClose();
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <CheckCircle2 size={16} />
+                        审批通过
+                      </button>
+                      <button 
+                        onClick={() => {
+                          dispatch({ type: 'SET_TASK_STATUS', payload: { id: modalData.id, status: '已拒绝', reason: '审批拒绝' } });
+                          handleClose();
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <XCircle size={16} />
+                        审批拒绝
+                      </button>
+                    </>
+                  )}
+                </>
               )}
 
               {['待接收', '已接收'].includes(modalData.status || '') && (

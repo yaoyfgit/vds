@@ -15,7 +15,7 @@ import {
   Map,
   ChevronRight
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, getTaskAbnormalRules, getAbnormalColor } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import type { Task } from '../../types';
 
@@ -307,7 +307,8 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
           {filteredTasks.map(task => {
             const driver = drivers.find(d => d.id === task.driverId);
             const vehicle = vehicles.find(v => v.id === task.vehicleId);
-            const isAbnormal = ['已拒绝', '已取消'].includes(task.status);
+            const abnormalRules = getTaskAbnormalRules(task);
+            const abnormalColor = abnormalRules.length > 0 ? getAbnormalColor(abnormalRules[0].code) : null;
             
             return (
               <div 
@@ -323,8 +324,9 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                 onMouseUp={handleLongPressEnd}
                 onMouseLeave={handleLongPressEnd}
                 className={cn(
-                  "bg-white rounded-xl p-4 border border-slate-100 cursor-pointer hover:border-brand-200 hover:shadow-sm transition-all",
-                  isAbnormal ? "border-red-200" : ""
+                  "bg-white rounded-xl p-4 border cursor-pointer hover:shadow-sm transition-all",
+                  abnormalColor ? abnormalColor.border : "border-slate-100",
+                  abnormalColor ? "shadow-md" : ""
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
