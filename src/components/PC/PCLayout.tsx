@@ -8,6 +8,7 @@ import {
   Search,
   Plus,
   ChevronRight,
+  ChevronDown,
   Filter,
   MoreHorizontal,
   Edit2,
@@ -16,7 +17,10 @@ import {
   Eye,
   FileCheck,
   Map,
-  X
+  X,
+  Package,
+  MapPin,
+  Check
 } from 'lucide-react';
 import { cn, isTaskAbnormal, getTaskAbnormalRules } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
@@ -35,16 +39,46 @@ const PCLayout: React.FC<{
   onNavigateToTasks?: (filterStatus?: string) => void;
 }> = ({ activeTab, onTabChange, onNavigateToAudit, onNavigateToTasks }) => {
   const { dispatch } = useApp();
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['resources', 'operations']);
 
   const navItems = [
-    { id: 'activities', label: '活动管理', icon: LayoutDashboard },
-    { id: 'tasks', label: '任务调度', icon: ClipboardList },
-    { id: 'track', label: '轨迹大屏', icon: Map },
-    { id: 'audit', label: '资源审核', icon: FileCheck },
-    { id: 'vehicles', label: '车辆管理', icon: Car },
-    { id: 'drivers', label: '司机管理', icon: Users },
-    { id: 'suppliers', label: '供应商管理', icon: Building },
+    {
+      id: 'resources',
+      label: '资源中心',
+      icon: Package,
+      children: [
+        { id: 'suppliers', label: '供应商管理', icon: Building },
+        { id: 'vehicles', label: '车辆管理', icon: Car },
+        { id: 'drivers', label: '司机管理', icon: Users },
+        { id: 'audit', label: '资源审核', icon: FileCheck },
+      ]
+    },
+    {
+      id: 'operations',
+      label: '调度运营',
+      icon: LayoutDashboard,
+      children: [
+        { id: 'activities', label: '活动管理', icon: LayoutDashboard },
+        { id: 'tasks', label: '任务调度', icon: ClipboardList },
+      ]
+    },
+    {
+      id: 'monitoring',
+      label: '运行监控',
+      icon: Map,
+      children: [
+        { id: 'track', label: '轨迹大屏', icon: Map },
+      ]
+    },
   ];
+
+  const toggleMenu = (menuId: string) => {
+    setExpandedMenus(prev =>
+      prev.includes(menuId)
+        ? prev.filter(id => id !== menuId)
+        : [...prev, menuId]
+    );
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -59,19 +93,51 @@ const PCLayout: React.FC<{
 
         <nav className="flex-1 px-4 space-y-1">
           {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium",
-                activeTab === item.id 
-                  ? "bg-brand-50 text-brand-600 shadow-sm" 
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+            <div key={item.id}>
+              {/* 一级菜单 */}
+              <button
+                onClick={() => toggleMenu(item.id)}
+                className={cn(
+                  "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium",
+                  expandedMenus.includes(item.id)
+                    ? "bg-brand-50 text-brand-600"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon size={20} />
+                  {item.label}
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={cn(
+                    "transition-transform",
+                    expandedMenus.includes(item.id) ? "rotate-180" : ""
+                  )}
+                />
+              </button>
+
+              {/* 二级菜单 */}
+              {expandedMenus.includes(item.id) && item.children && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {item.children.map((child) => (
+                    <button
+                      key={child.id}
+                      onClick={() => onTabChange(child.id)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm",
+                        activeTab === child.id
+                          ? "bg-brand-100 text-brand-700 font-medium"
+                          : "text-slate-500 hover:bg-slate-50"
+                      )}
+                    >
+                      <child.icon size={16} />
+                      {child.label}
+                    </button>
+                  ))}
+                </div>
               )}
-            >
-              <item.icon size={20} />
-              {item.label}
-            </button>
+            </div>
           ))}
         </nav>
 
@@ -642,7 +708,7 @@ const TasksView = () => {
 };
 
 const VehiclesView = () => {
-  const { vehicles, activities, dispatch } = useApp();
+  const { vehicles, activities, workGroups, dispatch } = useApp();
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterSupplier, setFilterSupplier] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
@@ -650,6 +716,9 @@ const VehiclesView = () => {
   const [filterActivity, setFilterActivity] = useState<string>('');
   const [filterPlateNumber, setFilterPlateNumber] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [selectedVehicles, setSelectedVehicles] = useState<Vehicle[]>([]);
+  const [showBatchLocationModal, setShowBatchLocationModal] = useState(false);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
 
   const filteredVehicles = vehicles.filter(v => {
     if (filterStatus && v.status !== filterStatus) return false;
@@ -665,6 +734,41 @@ const VehiclesView = () => {
     '待审核': 'bg-amber-100 text-amber-700',
     '审核通过': 'bg-green-100 text-green-700',
     '审核不通过': 'bg-red-100 text-red-700',
+  };
+
+  const validateSelectedVehicles = () => {
+    if (selectedVehicles.length === 0) return false;
+    const activityIds = [...new Set(selectedVehicles.map(v => v.activityId))];
+    if (activityIds.length !== 1 || !activityIds[0]) return false;
+    return selectedVehicles.every(v => v.auditStatus === '审核通过');
+  };
+
+  const getActivityLocations = () => {
+    const activityId = selectedVehicles[0]?.activityId;
+    if (!activityId) return [];
+    const activityWorkGroups = workGroups.filter(wg => wg.activityId === activityId);
+    return [...new Set(activityWorkGroups.map(wg => wg.location))];
+  };
+
+  const handleBatchLocation = () => {
+    if (!validateSelectedVehicles()) {
+      alert('请选择同一活动且审核通过的车辆');
+      return;
+    }
+    setSelectedLocations([]);
+    setShowBatchLocationModal(true);
+  };
+
+  const handleConfirmBatchLocation = () => {
+    selectedVehicles.forEach(vehicle => {
+      dispatch({
+        type: 'BIND_ACTIVITY_LOCATION',
+        payload: { vehicleId: vehicle.id, locations: selectedLocations }
+      });
+    });
+    setShowBatchLocationModal(false);
+    setSelectedVehicles([]);
+    setSelectedLocations([]);
   };
 
   return (
@@ -685,6 +789,19 @@ const VehiclesView = () => {
             </button>
             <button className="text-slate-600 hover:text-slate-800 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium flex items-center gap-2">
               下载模板
+            </button>
+            <button 
+              onClick={handleBatchLocation}
+              disabled={!validateSelectedVehicles()}
+              className={cn(
+                "px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
+                validateSelectedVehicles()
+                  ? "border-green-500 text-green-600 hover:bg-green-50"
+                  : "border-slate-200 text-slate-400 cursor-not-allowed"
+              )}
+            >
+              <MapPin size={16} />
+              批量维护驻点
             </button>
           </div>
         </div>
@@ -775,6 +892,20 @@ const VehiclesView = () => {
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
+                  <th className="px-4 py-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedVehicles.length === filteredVehicles.length && filteredVehicles.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedVehicles(filteredVehicles);
+                        } else {
+                          setSelectedVehicles([]);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">车牌号</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">车型</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">品牌</th>
@@ -787,94 +918,111 @@ const VehiclesView = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
-                {filteredVehicles.map(vehicle => (
-                  <tr key={vehicle.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900">{vehicle.plateNumber}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                        {vehicle.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.brand}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.capacity}座</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.licenseRequired}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.supplier}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                        auditStatusStyles[vehicle.auditStatus]
-                      )}>
-                        {vehicle.auditStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                        vehicle.status === '可调配' ? "bg-green-100 text-green-800" :
-                        vehicle.status === '已调度' ? "bg-blue-100 text-blue-800" :
-                        vehicle.status === '执行中' ? "bg-blue-100 text-blue-800" : 
-                        "bg-red-100 text-red-800"
-                      )}>
-                        {vehicle.status}
-                      </span>
-                      {vehicle.unavailableReason && vehicle.status === '不可用' && (
-                        <div className="text-xs text-red-600 mt-1">{vehicle.unavailableReason}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setSelectedVehicle(vehicle)}
-                          className="text-brand-600 hover:text-brand-800 flex items-center gap-1"
-                        >
-                          <Eye size={14} />
-                          详情
-                        </button>
-                        {(vehicle.auditStatus === '待审核' || vehicle.auditStatus === '审核不通过') && (
-                          <button
-                            onClick={() => {
-                              dispatch({ type: 'OPEN_MODAL', payload: { type: 'EDIT_VEHICLE', data: vehicle } });
-                            }}
-                            className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                          >
-                            <Edit2 size={14} />
-                            编辑
-                          </button>
-                        )}
-                        {vehicle.status === '可调配' && (
-                          <button
-                            onClick={() => {
-                              dispatch({ type: 'OPEN_MODAL', payload: { type: 'SET_VEHICLE_UNAVAILABLE', data: vehicle } });
-                            }}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            设为不可用
-                          </button>
-                        )}
-                        {vehicle.status === '不可用' && (
-                          <button
-                            onClick={() => {
-                              dispatch({ type: 'SET_VEHICLE_AVAILABLE', payload: { id: vehicle.id } });
-                            }}
-                            className="text-green-600 hover:text-green-800"
-                          >
-                            恢复可用
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            dispatch({ type: 'OPEN_MODAL', payload: { type: 'DELETE_VEHICLE', data: vehicle } });
+                {filteredVehicles.map(vehicle => {
+                  const isSelected = selectedVehicles.some(v => v.id === vehicle.id);
+                  return (
+                    <tr key={vehicle.id} className={cn("hover:bg-slate-50 transition-colors", isSelected && "bg-green-50/50")}>
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedVehicles([...selectedVehicles, vehicle]);
+                            } else {
+                              setSelectedVehicles(selectedVehicles.filter(v => v.id !== vehicle.id));
+                            }
                           }}
-                          className="text-slate-500 hover:text-slate-700"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          className="w-4 h-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-900">{vehicle.plateNumber}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                          {vehicle.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.brand}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.capacity}座</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.licenseRequired}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{vehicle.supplier}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                          auditStatusStyles[vehicle.auditStatus]
+                        )}>
+                          {vehicle.auditStatus}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                          vehicle.status === '可调配' ? "bg-green-100 text-green-800" :
+                          vehicle.status === '已调度' ? "bg-blue-100 text-blue-800" :
+                          vehicle.status === '执行中' ? "bg-blue-100 text-blue-800" : 
+                          "bg-red-100 text-red-800"
+                        )}>
+                          {vehicle.status}
+                        </span>
+                        {vehicle.unavailableReason && vehicle.status === '不可用' && (
+                          <div className="text-xs text-red-600 mt-1">{vehicle.unavailableReason}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedVehicle(vehicle)}
+                            className="text-brand-600 hover:text-brand-800 flex items-center gap-1"
+                          >
+                            <Eye size={14} />
+                            详情
+                          </button>
+                          {(vehicle.auditStatus === '待审核' || vehicle.auditStatus === '审核不通过') && (
+                            <button
+                              onClick={() => {
+                                dispatch({ type: 'OPEN_MODAL', payload: { type: 'EDIT_VEHICLE', data: vehicle } });
+                              }}
+                              className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            >
+                              <Edit2 size={14} />
+                              编辑
+                            </button>
+                          )}
+                          {vehicle.status === '可调配' && (
+                            <button
+                              onClick={() => {
+                                dispatch({ type: 'OPEN_MODAL', payload: { type: 'SET_VEHICLE_UNAVAILABLE', data: vehicle } });
+                              }}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              设为不可用
+                            </button>
+                          )}
+                          {vehicle.status === '不可用' && (
+                            <button
+                              onClick={() => {
+                                dispatch({ type: 'SET_VEHICLE_AVAILABLE', payload: { id: vehicle.id } });
+                              }}
+                              className="text-green-600 hover:text-green-800"
+                            >
+                              恢复可用
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              dispatch({ type: 'OPEN_MODAL', payload: { type: 'DELETE_VEHICLE', data: vehicle } });
+                            }}
+                            className="text-slate-500 hover:text-slate-700"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -891,6 +1039,92 @@ const VehiclesView = () => {
           vehicle={selectedVehicle}
           onClose={() => setSelectedVehicle(null)}
         />
+      )}
+
+      {/* 批量维护驻点弹窗 */}
+      {showBatchLocationModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-[500px] max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">批量维护驻点场地</h3>
+              <button onClick={() => setShowBatchLocationModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="mb-4 p-3 bg-green-50 rounded-lg text-sm text-green-700">
+                <p className="font-medium">已选择 {selectedVehicles.length} 辆车辆</p>
+                <p>所属活动：{activities.find(a => a.id === selectedVehicles[0]?.activityId)?.name}</p>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm font-medium text-slate-700 mb-2">选择该活动工作小组中的地点（多选）</p>
+              </div>
+
+              {getActivityLocations().length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <MapPin size={32} className="text-slate-300 mx-auto mb-2" />
+                  <p>该活动暂无工作小组地点</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {getActivityLocations().map(location => (
+                    <label
+                      key={location}
+                      className={cn(
+                        "flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors",
+                        selectedLocations.includes(location)
+                          ? "border-green-500 bg-green-50"
+                          : "border-slate-200 hover:border-green-300"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedLocations.includes(location)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLocations([...selectedLocations, location]);
+                          } else {
+                            setSelectedLocations(selectedLocations.filter(l => l !== location));
+                          }
+                        }}
+                        className="w-4 h-4 text-green-500"
+                      />
+                      <div className="flex-1">
+                        <span className="font-medium text-slate-900">{location}</span>
+                      </div>
+                      {selectedLocations.includes(location) && (
+                        <Check size={16} className="text-green-600" />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 p-6 border-t border-slate-200">
+              <button
+                onClick={() => setShowBatchLocationModal(false)}
+                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmBatchLocation}
+                disabled={selectedLocations.length === 0}
+                className={cn(
+                  "px-4 py-2 rounded-lg font-medium",
+                  selectedLocations.length > 0
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-slate-300 text-slate-500 cursor-not-allowed"
+                )}
+              >
+                确认绑定 ({selectedLocations.length})
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

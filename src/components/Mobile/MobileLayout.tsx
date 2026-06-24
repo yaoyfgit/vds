@@ -80,7 +80,6 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
   const [showHistory, setShowHistory] = useState(false);
   const [longPressTask, setLongPressTask] = useState<Task | null>(null);
   const [longPressLocation, setLongPressLocation] = useState<string | null>(null);
-  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
@@ -88,6 +87,8 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
   const [suspendReason, setSuspendReason] = useState('');
   const [faultDescription, setFaultDescription] = useState('');
   const [agreedPrivacy, setAgreedPrivacy] = useState(false);
+  const [showArrivalConfirmModal, setShowArrivalConfirmModal] = useState(false);
+  const [arrivalLocation, setArrivalLocation] = useState<string | null>(null);
 
   useEffect(() => {
     const driver = drivers.find(d => d.status === '可调配');
@@ -104,34 +105,10 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
     if (!['已接收', '执行中'].includes(task.status)) return;
     if ((task.reachedLocations || []).includes(location)) return;
     
-    const timer = window.setTimeout(() => {
-      setLongPressTask(task);
-      setLongPressLocation(location);
-    }, 500);
-    setLongPressTimer(timer);
-  };
-
-  const handleLocationTouchEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
-    }
-  };
-
-  const handleConfirmArrival = () => {
-    if (longPressTask && longPressLocation) {
-      dispatch({
-        type: 'UPDATE_TASK',
-        payload: {
-          id: longPressTask.id,
-          data: {
-            reachedLocations: [...(longPressTask.reachedLocations || []), longPressLocation]
-          }
-        }
-      });
-      setLongPressTask(null);
-      setLongPressLocation(null);
-    }
+    setLongPressTask(task);
+    setLongPressLocation(location);
+    setArrivalLocation(location);
+    setShowArrivalConfirmModal(true);
   };
 
   const [activeFilter, setActiveFilter] = useState<string>('all');
@@ -288,19 +265,21 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
     );
   }
 
-  if (selectedTask) {
-    return (
-      <div className="p-4 space-y-4">
-        <div className="flex items-center gap-3 mb-4">
-          <button 
-            onClick={() => setSelectedTask(null)}
-            className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center hover:bg-slate-50 transition-colors"
-          >
-            <ArrowLeft size={20} className="text-brand-600" />
-          </button>
-          <h2 className="text-lg font-bold text-slate-900">任务详情</h2>
-        </div>
+  const selectedTaskView = selectedTask && (
+    <div className="fixed inset-0 bg-slate-50 z-40 overflow-y-auto">
+      <div className="max-w-md mx-auto min-h-full bg-white shadow-xl">
+        <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+        <button 
+          onClick={() => setSelectedTask(null)}
+          className="p-2 -ml-2 text-slate-600 hover:text-slate-900"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-lg font-bold text-slate-900">任务详情</h1>
+        <div className="w-8" />
+      </div>
 
+      <div className="p-4 space-y-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <div className="flex justify-between items-start mb-4">
             <div className="flex items-center gap-2">
@@ -332,22 +311,13 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
               </div>
               <div className="flex-1 space-y-3">
                 <div
-                  onTouchStart={(e) => {
+                  onClick={(e) => {
                     e.stopPropagation();
                     handleLocationTouchStart(selectedTask, selectedTask.from);
                   }}
-                  onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    handleLocationTouchEnd();
-                  }}
-                  onTouchCancel={(e) => {
-                    e.stopPropagation();
-                    handleLocationTouchEnd();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    "p-2 rounded-lg transition-colors",
-                    (selectedTask.reachedLocations || []).includes(selectedTask.from) ? "bg-slate-100" : "bg-transparent"
+                    "p-2 rounded-lg transition-colors cursor-pointer",
+                    (selectedTask.reachedLocations || []).includes(selectedTask.from) ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
                   )}
                 >
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">出发地</p>
@@ -364,22 +334,13 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                     {selectedTask.waypoints.map((waypoint, index) => (
                       <div
                         key={index}
-                        onTouchStart={(e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
                           handleLocationTouchStart(selectedTask, waypoint.name);
                         }}
-                        onTouchEnd={(e) => {
-                          e.stopPropagation();
-                          handleLocationTouchEnd();
-                        }}
-                        onTouchCancel={(e) => {
-                          e.stopPropagation();
-                          handleLocationTouchEnd();
-                        }}
-                        onClick={(e) => e.stopPropagation()}
                         className={cn(
-                          "p-2 rounded-lg transition-colors",
-                          (selectedTask.reachedLocations || []).includes(waypoint.name) ? "bg-slate-100" : "bg-transparent"
+                          "p-2 rounded-lg transition-colors cursor-pointer",
+                          (selectedTask.reachedLocations || []).includes(waypoint.name) ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
                         )}
                       >
                         <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">途经点 {index + 1}</p>
@@ -394,22 +355,13 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
                 )}
                 
                 <div
-                  onTouchStart={(e) => {
+                  onClick={(e) => {
                     e.stopPropagation();
                     handleLocationTouchStart(selectedTask, selectedTask.to);
                   }}
-                  onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    handleLocationTouchEnd();
-                  }}
-                  onTouchCancel={(e) => {
-                    e.stopPropagation();
-                    handleLocationTouchEnd();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    "p-2 rounded-lg transition-colors",
-                    (selectedTask.reachedLocations || []).includes(selectedTask.to) ? "bg-slate-100" : "bg-transparent"
+                    "p-2 rounded-lg transition-colors cursor-pointer",
+                    (selectedTask.reachedLocations || []).includes(selectedTask.to) ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
                   )}
                 >
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">目的地</p>
@@ -607,11 +559,15 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
           </div>
         )}
       </div>
-    );
-  }
+    </div>
+  </div>
+  );
 
   return (
     <div>
+      {/* 任务详情视图 */}
+      {selectedTaskView}
+      
       {activeTab === 'tasks' && (
         <div className="p-4 space-y-4">
           {/* 统计卡片 - 可点击筛选 */}
@@ -979,6 +935,73 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
       )}
 
       {/* Modals */}
+      {showArrivalConfirmModal && arrivalLocation && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
+          <div className="bg-white rounded-t-3xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-slate-900">确认到达</h3>
+              <button 
+                onClick={() => {
+                  setShowArrivalConfirmModal(false);
+                  setArrivalLocation(null);
+                  setLongPressTask(null);
+                  setLongPressLocation(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MapPin size={32} className="text-green-600" />
+                </div>
+                <p className="text-lg font-medium text-slate-900">确认抵达 {arrivalLocation}？</p>
+                <p className="text-sm text-slate-500 mt-2">点击确认后将更新您的任务进度</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowArrivalConfirmModal(false);
+                    setArrivalLocation(null);
+                    setLongPressTask(null);
+                    setLongPressLocation(null);
+                  }}
+                  className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    if (longPressTask && longPressLocation) {
+                      dispatch({
+                        type: 'UPDATE_TASK',
+                        payload: {
+                          id: longPressTask.id,
+                          data: {
+                            reachedLocations: [...(longPressTask.reachedLocations || []), longPressLocation]
+                          }
+                        }
+                      });
+                      setLongPressTask(null);
+                      setLongPressLocation(null);
+                      setArrivalLocation(null);
+                      setShowArrivalConfirmModal(false);
+                    }
+                  }}
+                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:from-green-600 hover:to-emerald-700 transition-all shadow-md shadow-green-200"
+                >
+                  确认抵达
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showRejectModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
           <div className="bg-white rounded-t-3xl w-full max-w-md p-6">
@@ -1007,52 +1030,6 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
               >
                 确认拒绝
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {longPressTask && longPressLocation && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">确认到达</h3>
-              <button 
-                onClick={() => {
-                  setLongPressTask(null);
-                  setLongPressLocation(null);
-                }}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <XCircle size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-brand-50 rounded-xl p-4">
-                <p className="text-sm text-brand-700 font-medium mb-1">到达地点</p>
-                <p className="text-lg font-bold text-brand-900">{longPressLocation}</p>
-              </div>
-
-              <p className="text-sm text-slate-600">确认已到达该地点？</p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setLongPressTask(null);
-                    setLongPressLocation(null);
-                  }}
-                  className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleConfirmArrival}
-                  className="flex-1 bg-gradient-to-r from-brand-600 to-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:from-brand-700 hover:to-blue-700 transition-all shadow-md shadow-brand-200"
-                >
-                  确认到达
-                </button>
-              </div>
             </div>
           </div>
         </div>

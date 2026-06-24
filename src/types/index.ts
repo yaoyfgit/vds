@@ -14,8 +14,8 @@ export interface WorkGroup {
   location: string;
   fieldManager?: string;
   fieldManagerPhone?: string;
-  fieldDispatcher: string;
-  fieldDispatcherPhone: string;
+  fieldDispatcher: string[];
+  fieldDispatcherPhone: string[];
   pendingTaskCount: number;
   createdAt: string;
 }

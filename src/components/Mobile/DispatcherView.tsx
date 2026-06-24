@@ -323,49 +323,57 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                 onMouseUp={handleLongPressEnd}
                 onMouseLeave={handleLongPressEnd}
                 className={cn(
-                  "bg-white rounded-xl p-3 shadow-sm border cursor-pointer hover:shadow-md transition-all duration-300 min-h-[72px]",
-                  isAbnormal ? "border-red-200" : "border-slate-100",
-                  isAbnormal && "hover:border-red-400"
+                  "bg-white rounded-xl p-4 border border-slate-100 cursor-pointer hover:border-brand-200 hover:shadow-sm transition-all",
+                  isAbnormal ? "border-red-200" : ""
                 )}
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded-full text-[10px] font-bold",
-                        task.status === '执行中' ? "bg-green-100 text-green-700" :
-                        task.status === '已接收' ? "bg-blue-100 text-blue-700" :
-                        task.status === '待派发' ? "bg-amber-100 text-amber-700" :
-                        task.status === '待接收' ? "bg-indigo-100 text-indigo-700" :
-                        task.status === '已拒绝' ? "bg-red-100 text-red-700" :
-                        task.status === '已取消' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
-                      )}>{task.status}</span>
-                      {isAbnormal && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600">
-                          {task.status === '已拒绝' ? 'E2' : 'E1'}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <h4 className="font-bold text-slate-900 text-sm truncate mb-1">{task.name}</h4>
-                    
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
-                      <span>{task.date === new Date().toISOString().split('T')[0] ? '今日' : task.date}</span>
-                      <span>{task.startTime}-{task.endTime}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                      {driver && <span>{driver.name}</span>}
-                      {vehicle && <span>· {vehicle.plateNumber}</span>}
-                      {!driver && !vehicle && task.status === '待派发' && (
-                        <span className="text-red-500 font-medium">未分配</span>
-                      )}
-                    </div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-xs font-medium",
+                      task.status === '执行中' ? "bg-green-100 text-green-700" :
+                      task.status === '已接收' ? "bg-blue-100 text-blue-700" :
+                      task.status === '待派发' ? "bg-amber-100 text-amber-700" :
+                      task.status === '待接收' ? "bg-indigo-100 text-indigo-700" :
+                      task.status === '已拒绝' ? "bg-red-100 text-red-700" :
+                      task.status === '已取消' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
+                    )}>
+                      {task.status}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {task.date === new Date().toISOString().split('T')[0] ? '今日' : task.date}
+                    </span>
+                    <span className="text-xs text-slate-400">{task.startTime}-{task.endTime}</span>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                    <MapPin size={14} className="text-slate-400" />
-                  </div>
+                  <ChevronRight size={16} className="text-slate-300" />
                 </div>
+                
+                <h4 className="font-semibold text-slate-900 mb-2">{task.name}</h4>
+                
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <MapPin size={12} className="text-green-500" />
+                  <span className="truncate max-w-[80px]">{task.from}</span>
+                  {task.waypoints && task.waypoints.length > 0 && (
+                    <>
+                      <span>→</span>
+                      <span className="text-brand-500">{task.waypoints.length}个途经</span>
+                      <span>→</span>
+                    </>
+                  )}
+                  {!task.waypoints || task.waypoints.length === 0 && <span>→</span>}
+                  <MapPin size={12} className="text-red-500" />
+                  <span className="truncate max-w-[80px]">{task.to}</span>
+                </div>
+
+                {(driver || vehicle || (task.status === '待派发' && !task.vehicleId && !task.driverId)) && (
+                  <div className="flex items-center gap-3 text-xs text-slate-400 mt-2">
+                    {driver && <span>{driver.name}</span>}
+                    {vehicle && <span>· {vehicle.plateNumber}</span>}
+                    {!driver && !vehicle && task.status === '待派发' && (
+                      <span className="text-red-500 font-medium">未分配</span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -797,7 +805,7 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
               {reassignType === 'vehicle' ? (
                 vehicles.filter(v => v.status === '可调配').map(vehicle => (
                   <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.plateNumber} - {vehicle.brand}
+                    {vehicle.plateNumber} - {vehicle.brand} ({vehicle.type} · {vehicle.capacity}座)
                   </option>
                 ))
               ) : (

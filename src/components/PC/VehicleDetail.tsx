@@ -25,7 +25,7 @@ interface VehicleDetailProps {
 }
 
 const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
-  const { activities, vehicles, drivers, dispatch } = useApp();
+  const { activities, vehicles, drivers, workGroups, dispatch } = useApp();
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditAction, setAuditAction] = useState<'approve' | 'reject'>('approve');
   const [auditRemark, setAuditRemark] = useState('');
@@ -45,7 +45,9 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
     d.status === '可调配'
   );
 
-  const allLocations = [...new Set(activities.map(a => a.location))];
+  const activityLocations = currentVehicle.activityId 
+    ? [...new Set(workGroups.filter(wg => wg.activityId === currentVehicle.activityId).map(wg => wg.location))]
+    : [];
 
   const statusStyles = {
     '可调配': 'bg-green-100 text-green-700',
@@ -567,17 +569,18 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
 
             <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-4 p-3 bg-green-50 rounded-lg text-sm text-green-700">
-                <p className="font-medium">选择活动地点有权限调用（多选）</p>
+                <p className="font-medium">选择该活动工作小组中的地点（多选）</p>
+                {activity && <p>所属活动：{activity.name}</p>}
               </div>
 
-              {allLocations.length === 0 ? (
+              {activityLocations.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
                   <MapPin size={32} className="text-slate-300 mx-auto mb-2" />
-                  <p>暂无活动地点</p>
+                  <p>该活动暂无工作小组地点</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {allLocations.map(location => (
+                  {activityLocations.map(location => (
                     <label
                       key={location}
                       className={cn(

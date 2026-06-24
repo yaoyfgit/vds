@@ -531,9 +531,15 @@ const ActivityWorkGroupsTab: React.FC<{
     location: '',
     fieldManager: '',
     fieldManagerPhone: '',
-    fieldDispatcher: '',
-    fieldDispatcherPhone: ''
+    fieldDispatcher: [] as string[],
+    fieldDispatcherPhone: [] as string[]
   });
+
+  const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
+  const [searchType, setSearchType] = useState<'manager' | 'dispatcher' | null>(null);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { drivers } = useApp();
 
   const handleOpenModal = (workGroup?: WorkGroup) => {
     if (workGroup) {
@@ -542,8 +548,8 @@ const ActivityWorkGroupsTab: React.FC<{
         location: workGroup.location,
         fieldManager: workGroup.fieldManager || '',
         fieldManagerPhone: workGroup.fieldManagerPhone || '',
-        fieldDispatcher: workGroup.fieldDispatcher,
-        fieldDispatcherPhone: workGroup.fieldDispatcherPhone
+        fieldDispatcher: workGroup.fieldDispatcher || [],
+        fieldDispatcherPhone: workGroup.fieldDispatcherPhone || []
       });
     } else {
       setEditingWorkGroup(null);
@@ -551,15 +557,15 @@ const ActivityWorkGroupsTab: React.FC<{
         location: '',
         fieldManager: '',
         fieldManagerPhone: '',
-        fieldDispatcher: '',
-        fieldDispatcherPhone: ''
+        fieldDispatcher: [],
+        fieldDispatcherPhone: []
       });
     }
     setShowModal(true);
   };
 
   const handleSave = () => {
-    if (!formData.location || !formData.fieldDispatcher || !formData.fieldDispatcherPhone) {
+    if (!formData.location || formData.fieldDispatcher.length === 0 || formData.fieldDispatcherPhone.length === 0) {
       alert('请填写必填项（地点、现场调度员、调度员电话）');
       return;
     }
@@ -612,6 +618,57 @@ const ActivityWorkGroupsTab: React.FC<{
     }
   };
 
+  // 搜索系统账号
+  const handleSearch = (query: string, type: 'manager' | 'dispatcher') => {
+    setSearchQuery(query);
+    setSearchType(type);
+    
+    if (!query.trim()) {
+      setSearchResults([]);
+      setShowSearchDropdown(false);
+      return;
+    }
+
+    const results = drivers
+      .filter(d => 
+        d.name.includes(query) || 
+        d.phone.includes(query)
+      )
+      .map(d => ({ name: d.name, phone: d.phone }))
+      .slice(0, 5);
+
+    setSearchResults(results);
+    setShowSearchDropdown(results.length > 0);
+  };
+
+  // 选择搜索结果
+  const handleSelectSearchResult = (result: { name: string; phone: string }) => {
+    if (searchType === 'manager') {
+      setFormData({ ...formData, fieldManager: result.name, fieldManagerPhone: result.phone });
+    } else if (searchType === 'dispatcher') {
+      // 检查是否已存在
+      if (!formData.fieldDispatcher.includes(result.name)) {
+        setFormData({
+          ...formData,
+          fieldDispatcher: [...formData.fieldDispatcher, result.name],
+          fieldDispatcherPhone: [...formData.fieldDispatcherPhone, result.phone]
+        });
+      }
+    }
+    setShowSearchDropdown(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  // 删除调度员
+  const handleRemoveDispatcher = (index: number) => {
+    setFormData({
+      ...formData,
+      fieldDispatcher: formData.fieldDispatcher.filter((_, i) => i !== index),
+      fieldDispatcherPhone: formData.fieldDispatcherPhone.filter((_, i) => i !== index)
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -649,8 +706,11 @@ const ActivityWorkGroupsTab: React.FC<{
                   )}
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  <div>{wg.fieldDispatcher}</div>
-                  <div className="text-xs text-slate-400">{wg.fieldDispatcherPhone}</div>
+                  {wg.fieldDispatcher.map((name, i) => (
+                    <div key={i} className="text-xs">
+                      {name} <span className="text-slate-400">({wg.fieldDispatcherPhone[i]})</span>
+                    </div>
+                  ))}
                 </td>
                 <td className="px-4 py-3">
                   <span className={cn(
@@ -725,13 +785,32 @@ const ActivityWorkGroupsTab: React.FC<{
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   现场负责人
                 </label>
-                <input
-                  type="text"
-                  value={formData.fieldManager}
-                  onChange={(e) => setFormData({ ...formData, fieldManager: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
-                  placeholder="请输入现场负责人姓名"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.fieldManager}
+                    onChange={(e) => {
+                      setFormData({ ...formData, fieldManager: e.target.value });
+                      handleSearch(e.target.value, 'manager');
+                    }}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
+                    placeholder="请输入现场负责人姓名（支持搜索系统账号）"
+                  />
+                  {showSearchDropdown && searchType === 'manager' && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {searchResults.map((result, i) => (
+                        <div
+                          key={i}
+                          onClick={() => handleSelectSearchResult(result)}
+                          className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                        >
+                          <div className="font-medium">{result.name}</div>
+                          <div className="text-xs text-slate-500">{result.phone}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -751,26 +830,48 @@ const ActivityWorkGroupsTab: React.FC<{
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   现场调度员 <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.fieldDispatcher}
-                  onChange={(e) => setFormData({ ...formData, fieldDispatcher: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
-                  placeholder="请输入现场调度员姓名"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  调度员电话 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.fieldDispatcherPhone}
-                  onChange={(e) => setFormData({ ...formData, fieldDispatcherPhone: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
-                  placeholder="请输入调度员电话"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value, 'dispatcher')}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
+                    placeholder="请输入现场调度员姓名（支持搜索系统账号）"
+                  />
+                  {showSearchDropdown && searchType === 'dispatcher' && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {searchResults.map((result, i) => (
+                        <div
+                          key={i}
+                          onClick={() => handleSelectSearchResult(result)}
+                          className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                        >
+                          <div className="font-medium">{result.name}</div>
+                          <div className="text-xs text-slate-500">{result.phone}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {formData.fieldDispatcher.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {formData.fieldDispatcher.map((name, i) => (
+                      <div key={i} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg">
+                        <div>
+                          <span className="text-sm font-medium">{name}</span>
+                          <span className="text-xs text-slate-500 ml-2">({formData.fieldDispatcherPhone[i]})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDispatcher(i)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
