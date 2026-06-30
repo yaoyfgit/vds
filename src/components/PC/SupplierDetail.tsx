@@ -13,7 +13,8 @@ import {
   Eye,
   Edit2,
   Filter,
-  Search
+  Search,
+  CalendarDays
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
@@ -26,11 +27,14 @@ interface SupplierDetailProps {
 
 const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) => {
   const { vehicles, drivers, activities, dispatch } = useApp();
-  const [activeTab, setActiveTab] = useState<'info' | 'vehicles' | 'drivers'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'vehicles' | 'drivers' | 'activities'>('info');
 
   // 获取该供应商名下的车辆和司机
   const supplierVehicles = vehicles.filter(v => v.supplier === supplier.name);
   const supplierDrivers = drivers.filter(d => d.supplier === supplier.name);
+  
+  // 获取该供应商参与的活动
+  const supplierActivities = activities.filter(a => a.supplierIds.includes(supplier.id));
 
   // 统计数据
   const vehicleStats = {
@@ -66,6 +70,12 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
     '已调度': 'bg-blue-100 text-blue-700',
     '执行中': 'bg-blue-100 text-blue-700',
     '不可用': 'bg-slate-100 text-slate-600',
+  };
+
+  const activityPeriodStyles = {
+    '筹备期': 'bg-blue-100 text-blue-700',
+    '执行期': 'bg-green-100 text-green-700',
+    '结束期': 'bg-slate-100 text-slate-600',
   };
 
   return (
@@ -142,6 +152,22 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
             {supplierDrivers.length > 0 && (
               <span className="bg-brand-100 text-brand-600 px-2 py-0.5 rounded-full text-xs">
                 {supplierDrivers.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('activities')}
+            className={cn(
+              "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+              activeTab === 'activities'
+                ? "border-brand-500 text-brand-600"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            )}
+          >
+            参与活动
+            {supplierActivities.length > 0 && (
+              <span className="bg-brand-100 text-brand-600 px-2 py-0.5 rounded-full text-xs">
+                {supplierActivities.length}
               </span>
             )}
           </button>
@@ -439,6 +465,73 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
                 <div className="bg-slate-50 rounded-xl p-8 text-center">
                   <Users size={48} className="text-slate-300 mx-auto mb-4" />
                   <p className="text-slate-500">该供应商暂无关联司机</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 参与活动 Tab */}
+          {activeTab === 'activities' && (
+            <div>
+              {supplierActivities.length > 0 ? (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold">
+                        <th className="px-4 py-3">活动名称</th>
+                        <th className="px-4 py-3">活动时期</th>
+                        <th className="px-4 py-3">活动时间</th>
+                        <th className="px-4 py-3">名下车辆数</th>
+                        <th className="px-4 py-3">名下司机数</th>
+                        <th className="px-4 py-3">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {supplierActivities.map(activity => {
+                        const activityVehicles = vehicles.filter(v => 
+                          v.activityId === activity.id && v.supplier === supplier.name
+                        );
+                        const activityDrivers = drivers.filter(d => 
+                          d.activityId === activity.id && d.supplier === supplier.name
+                        );
+                        return (
+                        <tr key={activity.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <button 
+                              onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'ACTIVITY_DETAIL_READONLY', data: activity } })}
+                              className="font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                            >
+                              {activity.name}
+                              <ChevronRight size={14} />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn('px-2 py-1 rounded-full text-xs font-medium', activityPeriodStyles[activity.period])}>
+                              {activity.period}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{activity.startTime} ~ {activity.endTime}</td>
+                          <td className="px-4 py-3 text-slate-600 font-medium">{activityVehicles.length}</td>
+                          <td className="px-4 py-3 text-slate-600 font-medium">{activityDrivers.length}</td>
+                          <td className="px-4 py-3">
+                            <button 
+                              onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'ACTIVITY_DETAIL_READONLY', data: activity } })}
+                              className="text-brand-600 text-sm font-medium flex items-center gap-1"
+                            >
+                              <Eye size={14} />
+                              详情
+                            </button>
+                          </td>
+                        </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-xl p-8 text-center">
+                  <CalendarDays size={48} className="text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">该供应商暂无参与活动</p>
                 </div>
               )}
             </div>

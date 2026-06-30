@@ -88,6 +88,7 @@ function PCApp() {
   const [driverOtherMaterials, setDriverOtherMaterials] = useState<string[]>([]);
   const [cancelReason, setCancelReason] = useState('');
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [pcActiveTab, setPcActiveTab] = useState<string>('activities');
   const [contractFiles, setContractFiles] = useState<string[]>([]);
   const [qualificationFiles, setQualificationFiles] = useState<string[]>([]);
@@ -167,6 +168,7 @@ function PCApp() {
     setShowManagerSearch(false);
     setManagerSearchResults([]);
     setSelectedActivityId('');
+    setSelectedSupplierId('');
     setVehicleTypeFilter('');
     setVehicleCapacityFilter('');
   };
@@ -897,6 +899,104 @@ function PCApp() {
         )}
       </Modal>
 
+      <Modal isOpen={activeModal === 'ACTIVITY_DETAIL_READONLY'} onClose={handleClose} title="活动详情" size="xl">
+        {modalData && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-2xl font-bold text-slate-900">{modalData.name || '未命名活动'}</h3>
+              <p className="text-sm text-slate-500">{modalData.startTime || ''} - {modalData.endTime || ''}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 mb-1">活动地点</p>
+                <p className="font-medium text-slate-900">{modalData.location || '未设置'}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 mb-1">活动状态</p>
+                <p className="font-medium text-slate-900">{modalData.status || '未知'}</p>
+              </div>
+            </div>
+
+            {modalData.description && (
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 mb-1">活动描述</p>
+                <p className="text-slate-700">{modalData.description}</p>
+              </div>
+            )}
+
+            <div className="space-y-6">
+              <h4 className="font-bold text-slate-700">关联车辆 ({(modalData.vehicleIds || []).length})</h4>
+              <div className="grid grid-cols-3 gap-3">
+                {(modalData.vehicleIds || []).map((vid: string) => {
+                  const v = vehicles.find(vv => vv.id === vid);
+                  return v ? (
+                    <div key={vid} className="bg-white border border-slate-200 p-3 rounded-lg flex items-center gap-2">
+                      <div className="w-8 h-8 bg-brand-50 rounded-full flex items-center justify-center">
+                        <Car size={14} className="text-brand-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{v.plateNumber}</p>
+                        <p className="text-xs text-slate-500">{v.brand}</p>
+                      </div>
+                    </div>
+                  ) : null;
+                })}
+                {(modalData.vehicleIds || []).length === 0 && (
+                  <p className="text-slate-400 text-sm col-span-3">暂未关联车辆</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="font-bold text-slate-700">关联司机 ({(modalData.driverIds || []).length})</h4>
+              <div className="grid grid-cols-3 gap-3">
+                {(modalData.driverIds || []).map((did: string) => {
+                  const d = drivers.find(dd => dd.id === did);
+                  return d ? (
+                    <div key={did} className="bg-white border border-slate-200 p-3 rounded-lg flex items-center gap-2">
+                      <div className="w-8 h-8 bg-brand-50 rounded-full flex items-center justify-center">
+                        <Users size={14} className="text-brand-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{d.name}</p>
+                        <p className="text-xs text-slate-500">{d.phone}</p>
+                      </div>
+                    </div>
+                  ) : null;
+                })}
+                {(modalData.driverIds || []).length === 0 && (
+                  <p className="text-slate-400 text-sm col-span-3">暂未关联司机</p>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200">
+              <h4 className="font-bold text-slate-700 mb-4">任务列表 ({tasks.filter(t => t.activityId === modalData.id).length})</h4>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {tasks.filter(t => t.activityId === modalData.id).map(task => (
+                  <div key={task.id} className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{task.name}</p>
+                      <p className="text-xs text-slate-500">{task.date} {task.startTime} - {task.endTime}</p>
+                    </div>
+                    <button 
+                      onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'TASK_DETAIL', data: task } })}
+                      className="text-brand-600 hover:text-brand-700"
+                    >
+                      <Eye size={16} />
+                    </button>
+                  </div>
+                ))}
+                {tasks.filter(t => t.activityId === modalData.id).length === 0 && (
+                  <p className="text-slate-400 text-sm">暂无任务</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <Modal isOpen={activeModal === 'ASSIGN_VEHICLES'} onClose={handleClose} title="关联车辆" size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -973,35 +1073,89 @@ function PCApp() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 活动选择 */}
           {activeModal === 'NEW_VEHICLE' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                所属活动
-              </label>
-              <select
-                value={selectedActivityId}
-                onChange={(e) => {
-                  const activityId = e.target.value;
-                  setSelectedActivityId(activityId);
-                  // 选择活动后自动设置可用日期为活动日期范围
-                  if (activityId) {
-                    const activity = activities.find(a => a.id === activityId);
-                    if (activity) {
-                      const startDate = activity.startTime.split(' ')[0];
-                      const endDate = activity.endTime.split(' ')[0];
-                      setVehicleAvailableRanges([{ from: startDate, to: endDate }]);
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  所属供应商 <span className="text-red-500">*</span>
+                </label>
+                {currentUser.role === 'supplier' ? (
+                  <div className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50">
+                    {currentUser.name}
+                  </div>
+                ) : (
+                  <select
+                    value={selectedSupplierId}
+                    onChange={(e) => {
+                      const supplierId = e.target.value;
+                      setSelectedSupplierId(supplierId);
+                      setSelectedActivityId('');
+                      setVehicleAvailableRanges([]);
+                    }}
+                    className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                  >
+                    <option value="">请选择供应商</option>
+                    {suppliers.map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  所属活动 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedActivityId}
+                  onChange={(e) => {
+                    const activityId = e.target.value;
+                    setSelectedActivityId(activityId);
+                    // 选择活动后自动设置可用日期为活动日期范围
+                    if (activityId) {
+                      const activity = activities.find(a => a.id === activityId);
+                      if (activity) {
+                        const startDate = activity.startTime.split(' ')[0];
+                        const endDate = activity.endTime.split(' ')[0];
+                        setVehicleAvailableRanges([{ from: startDate, to: endDate }]);
+                      }
+                    } else {
+                      setVehicleAvailableRanges([]);
                     }
-                  } else {
-                    setVehicleAvailableRanges([]);
+                  }}
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                >
+                  <option value="">请选择活动</option>
+                  {(() => {
+                    const currentSupplierId = currentUser.role === 'supplier' 
+                      ? suppliers.find(s => s.name === currentUser.name)?.id 
+                      : selectedSupplierId;
+                    return activities.filter(a => 
+                      a.period !== '结束期' && 
+                      (currentSupplierId ? a.supplierIds?.includes(currentSupplierId) : true)
+                    ).map(activity => (
+                      <option key={activity.id} value={activity.id}>{activity.name}</option>
+                    ));
+                  })()}
+                </select>
+                {(() => {
+                  const currentSupplierId = currentUser.role === 'supplier' 
+                    ? suppliers.find(s => s.name === currentUser.name)?.id 
+                    : selectedSupplierId;
+                  const supplierActivities = activities.filter(a => 
+                    a.period !== '结束期' && 
+                    (currentSupplierId ? a.supplierIds?.includes(currentSupplierId) : true)
+                  );
+                  if (currentSupplierId && supplierActivities.length === 0) {
+                    return (
+                      <p className="mt-2 text-sm text-amber-600">
+                        当前供应商暂无关联的筹备期/执行期活动，请先在活动详情页关联供应商
+                      </p>
+                    );
                   }
-                }}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-              >
-                <option value="">不关联活动</option>
-                {activities.filter(a => a.period !== '结束期').map(activity => (
-                  <option key={activity.id} value={activity.id}>{activity.name}</option>
-                ))}
-              </select>
-            </div>
+                  return null;
+                })()}
+              </div>
+            </>
           )}
           
           <div className="grid grid-cols-2 gap-4">
@@ -1085,22 +1239,6 @@ function PCApp() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">供应商</label>
-              {activeModal === 'NEW_VEHICLE' && currentUser.role === 'supplier' ? (
-                <div className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50">
-                  {currentUser.name}
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  defaultValue={activeModal === 'EDIT_VEHICLE' ? modalData?.supplier : ''}
-                  onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                  placeholder="车辆所属供应商"
-                />
-              )}
-            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">联系电话</label>
               <input

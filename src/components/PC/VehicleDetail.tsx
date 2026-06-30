@@ -155,6 +155,10 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
               </h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center gap-2">
+                  <span className="text-slate-500 w-24">所属供应商：</span>
+                  <span className="text-slate-900 font-medium">{currentVehicle.supplier}</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">车辆类型：</span>
                   <span className="text-slate-900 font-medium">{currentVehicle.type}</span>
                 </div>
@@ -173,10 +177,6 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">适用驾照：</span>
                   <span className="text-slate-900 font-medium">{currentVehicle.licenseRequired}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500 w-24">所属供应商：</span>
-                  <span className="text-slate-900 font-medium">{currentVehicle.supplier}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 w-24">所属活动：</span>
