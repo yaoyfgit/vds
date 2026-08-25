@@ -14,11 +14,19 @@ import {
   Edit2,
   Filter,
   Search,
-  CalendarDays
+  CalendarDays,
+  Download,
+  Trash2,
+  FileImage,
+  FileArchive,
+  FileSpreadsheet,
+  FileText as FileTextIcon,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
-import type { Supplier } from '../../types';
+import type { Supplier, SupplierAttachment } from '../../types';
+import HelpIcon from '../../components/HelpIcon';
+import { supplierHelpData } from '../../constants/helpData';
 
 interface SupplierDetailProps {
   supplier: Supplier;
@@ -95,6 +103,7 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <HelpIcon helpData={supplierHelpData['H.2.3']} />
             <button 
               onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'EDIT_SUPPLIER', data: supplier } })}
               className="text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2"
@@ -230,52 +239,53 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({ supplier, onClose }) =>
               </div>
 
               {/* 附件展示 */}
-              {supplier.attachments && ((supplier.attachments.contractFiles?.length || 0) + (supplier.attachments.qualificationFiles?.length || 0) + (supplier.attachments.otherFiles?.length || 0)) > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <FileText size={18} />
-                    附件
-                  </h3>
-                  <div className="space-y-4">
-                    {supplier.attachments.contractFiles?.length && supplier.attachments.contractFiles.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-500 mb-2">合同文件</label>
-                        <div className="flex gap-2 flex-wrap">
-                          {supplier.attachments.contractFiles.map((_, index) => (
-                            <div key={index} className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity">
-                              <FileText size={24} className="text-slate-400" />
-                            </div>
-                          ))}
-                        </div>
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <FileText size={18} />
+                  附件
+                </h3>
+                <div className="space-y-4">
+                  {supplier.attachments?.contractFiles && supplier.attachments.contractFiles.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-500 mb-2">合同文件</label>
+                      <div className="flex gap-3 flex-wrap">
+                        {supplier.attachments.contractFiles.map((file) => (
+                          <AttachmentCard key={file.id} attachment={file} />
+                        ))}
                       </div>
-                    )}
-                    {supplier.attachments.qualificationFiles?.length && supplier.attachments.qualificationFiles.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-500 mb-2">资质文件</label>
-                        <div className="flex gap-2 flex-wrap">
-                          {supplier.attachments.qualificationFiles.map((_, index) => (
-                            <div key={index} className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity">
-                              <FileText size={24} className="text-slate-400" />
-                            </div>
-                          ))}
-                        </div>
+                    </div>
+                  )}
+                  {supplier.attachments?.qualificationFiles && supplier.attachments.qualificationFiles.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-500 mb-2">资质文件</label>
+                      <div className="flex gap-3 flex-wrap">
+                        {supplier.attachments.qualificationFiles.map((file) => (
+                          <AttachmentCard key={file.id} attachment={file} />
+                        ))}
                       </div>
-                    )}
-                    {supplier.attachments.otherFiles?.length && supplier.attachments.otherFiles.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-500 mb-2">其他文件</label>
-                        <div className="flex gap-2 flex-wrap">
-                          {supplier.attachments.otherFiles.map((_, index) => (
-                            <div key={index} className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity">
-                              <FileText size={24} className="text-slate-400" />
-                            </div>
-                          ))}
-                        </div>
+                    </div>
+                  )}
+                  {supplier.attachments?.otherFiles && supplier.attachments.otherFiles.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-500 mb-2">其他文件</label>
+                      <div className="flex gap-3 flex-wrap">
+                        {supplier.attachments.otherFiles.map((file) => (
+                          <AttachmentCard key={file.id} attachment={file} />
+                        ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  {(!supplier.attachments || 
+                    (supplier.attachments.contractFiles?.length === 0 && 
+                     supplier.attachments.qualificationFiles?.length === 0 && 
+                     supplier.attachments.otherFiles?.length === 0)) && (
+                    <div className="bg-slate-50 rounded-xl p-8 text-center">
+                      <FileText size={32} className="text-slate-300 mx-auto mb-2" />
+                      <p className="text-slate-500 text-sm">暂无附件</p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* 资源统计 */}
               <div>
@@ -576,6 +586,7 @@ export const SuppliersView: React.FC = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">供应商管理</h2>
           <div className="flex gap-2">
+            <HelpIcon helpData={supplierHelpData['H.2.1']} />
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -676,6 +687,113 @@ export const SuppliersView: React.FC = () => {
           supplier={selectedSupplier}
           onClose={() => setSelectedSupplier(null)}
         />
+      )}
+    </>
+  );
+};
+
+const AttachmentCard: React.FC<{ attachment: SupplierAttachment }> = ({ attachment }) => {
+  const [showPreview, setShowPreview] = useState(false);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getFileIcon = (type: string) => {
+    const icons = {
+      pdf: <FileTextIcon size={24} className="text-red-500" />,
+      doc: <FileTextIcon size={24} className="text-blue-500" />,
+      docx: <FileTextIcon size={24} className="text-blue-500" />,
+      xls: <FileSpreadsheet size={24} className="text-green-500" />,
+      xlsx: <FileSpreadsheet size={24} className="text-green-500" />,
+      zip: <FileArchive size={24} className="text-amber-500" />,
+      rar: <FileArchive size={24} className="text-amber-500" />,
+      jpg: <FileImage size={24} className="text-purple-500" />,
+      jpeg: <FileImage size={24} className="text-purple-500" />,
+      png: <FileImage size={24} className="text-purple-500" />,
+    };
+    return icons[type as keyof typeof icons] || <FileTextIcon size={24} className="text-slate-400" />;
+  };
+
+  const isImage = ['jpg', 'jpeg', 'png'].includes(attachment.fileType);
+
+  return (
+    <>
+      <div className="w-40 bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md hover:border-brand-200 transition-all group">
+        <div className="h-24 bg-slate-50 flex items-center justify-center">
+          {getFileIcon(attachment.fileType)}
+        </div>
+        <div className="p-3">
+          <p className="text-xs font-medium text-slate-900 truncate mb-1" title={attachment.fileName}>
+            {attachment.fileName}
+          </p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">{formatFileSize(attachment.fileSize)}</span>
+            <span className="text-xs text-slate-400">{attachment.uploadTime.split(' ')[0]}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {isImage && (
+              <button
+                onClick={() => setShowPreview(true)}
+                className="flex-1 px-2 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1"
+              >
+                <Eye size={12} />
+                预览
+              </button>
+            )}
+            {attachment.fileType === 'pdf' && (
+              <button
+                onClick={() => setShowPreview(true)}
+                className="flex-1 px-2 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1"
+              >
+                <Eye size={12} />
+                预览
+              </button>
+            )}
+            <button
+              className="flex-1 px-2 py-1.5 bg-green-50 text-green-600 text-xs font-medium rounded-lg hover:bg-green-100 flex items-center justify-center gap-1"
+            >
+              <Download size={12} />
+              下载
+            </button>
+            <button
+              className="px-2 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showPreview && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowPreview(false)}>
+          <div className="bg-white rounded-2xl p-4 max-w-2xl w-[90vw] max-h-[80vh] overflow-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-bold text-slate-900">文件预览</h4>
+              <button onClick={() => setShowPreview(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </div>
+            {isImage ? (
+              <div className="flex justify-center">
+                <img
+                  src={`/api/files/${attachment.filePath}`}
+                  alt={attachment.fileName}
+                  className="max-w-full max-h-[60vh] rounded-lg"
+                  onClick={() => setShowPreview(false)}
+                />
+              </div>
+            ) : attachment.fileType === 'pdf' ? (
+              <div className="bg-slate-100 rounded-lg p-8 text-center">
+                <FileTextIcon size={64} className="text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-600 mb-4">PDF 文件预览</p>
+                <p className="text-slate-400 text-sm">{attachment.fileName}</p>
+              </div>
+            ) : null}
+          </div>
+        </div>
       )}
     </>
   );

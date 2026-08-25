@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Activity, Vehicle, Driver, Task, TaskStatus, Supplier, AuditRecord, WorkGroup } from '../types';
-import { activities, vehicles, drivers, tasks, suppliers, auditRecords, workGroups } from '../data/mockData';
+import { Activity, Vehicle, Driver, Task, TaskStatus, Supplier, AuditRecord, WorkGroup, Dispatcher } from '../types';
+import { activities, vehicles, drivers, tasks, suppliers, auditRecords, workGroups, dispatchers } from '../data/mockData';
 
 interface AppState {
   activities: Activity[];
@@ -10,6 +10,7 @@ interface AppState {
   suppliers: Supplier[];
   auditRecords: AuditRecord[];
   workGroups: WorkGroup[];
+  dispatchers: Dispatcher[];
   activeModal: string | null;
   modalData: any;
   currentUser: {
@@ -28,6 +29,7 @@ const initialState: AppState = {
   suppliers: suppliers,
   auditRecords: auditRecords,
   workGroups: workGroups,
+  dispatchers: dispatchers,
   activeModal: null,
   modalData: null,
   currentUser: {
@@ -77,7 +79,10 @@ type Action =
   | { type: 'REMOVE_DRIVER_FROM_ACTIVITY'; payload: { activityId: string; driverId: string } }
   | { type: 'ADD_AUDIT_RECORD'; payload: AuditRecord }
   | { type: 'OPEN_MODAL'; payload: { type: string; data?: any } }
-  | { type: 'CLOSE_MODAL' };
+  | { type: 'CLOSE_MODAL' }
+  | { type: 'ADD_DISPATCHER'; payload: Dispatcher }
+  | { type: 'UPDATE_DISPATCHER'; payload: { id: string; data: Partial<Dispatcher> } }
+  | { type: 'DELETE_DISPATCHER'; payload: { id: string } };
 
 const reducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
@@ -135,18 +140,26 @@ const reducer = (state: AppState, action: Action): AppState => {
         tasks: state.tasks.map(task => 
           task.id === action.payload.id ? updatedTask : task
         ),
-        ...(shouldReleaseResources && {
-          vehicles: state.vehicles.map(vehicle => 
-            vehicle.id === taskToUpdate.vehicleId 
-              ? { ...vehicle, status: '可调配' } 
-              : vehicle
-          ),
-          drivers: state.drivers.map(driver => 
-            driver.id === taskToUpdate.driverId 
-              ? { ...driver, status: '可调配' } 
-              : driver
-          )
-        })
+        ...(shouldReleaseResources && (() => {
+          // 释放该任务占用的全部车辆与司机（支持多车分配）
+          const releaseList = (taskToUpdate.assignments && taskToUpdate.assignments.length > 0)
+            ? taskToUpdate.assignments
+            : (taskToUpdate.vehicleId ? [{ vehicleId: taskToUpdate.vehicleId, driverId: taskToUpdate.driverId }] : []);
+          const releaseVehicleIds = releaseList.map(a => a.vehicleId).filter(Boolean);
+          const releaseDriverIds = releaseList.map(a => a.driverId).filter(Boolean);
+          return {
+            vehicles: state.vehicles.map(vehicle =>
+              releaseVehicleIds.includes(vehicle.id)
+                ? { ...vehicle, status: '可调配' }
+                : vehicle
+            ),
+            drivers: state.drivers.map(driver =>
+              releaseDriverIds.includes(driver.id)
+                ? { ...driver, status: '可调配' }
+                : driver
+            )
+          };
+        })())
       };
     case 'ASSIGN_RESOURCE_TO_TASK':
       const taskToAssign = state.tasks.find(t => t.id === action.payload.taskId);
@@ -165,10 +178,16 @@ const reducer = (state: AppState, action: Action): AppState => {
                 remark: '分配车辆/司机'
               }
             ];
-            return { 
-              ...task, 
+            return {
+              ...task,
               vehicleId: action.payload.vehicleId || task.vehicleId,
               driverId: action.payload.driverId || task.driverId,
+              // 同步多车辆分配：已有 assignments 时更新首辆（主），否则新建单条分配
+              assignments: (task.assignments && task.assignments.length > 0)
+                ? task.assignments.map((a, i) => i === 0
+                    ? { vehicleId: action.payload.vehicleId || a.vehicleId, driverId: action.payload.driverId || a.driverId }
+                    : a)
+                : (action.payload.vehicleId ? [{ vehicleId: action.payload.vehicleId, driverId: action.payload.driverId }] : task.assignments),
               history: newHistory
             };
           }
@@ -204,10 +223,16 @@ const reducer = (state: AppState, action: Action): AppState => {
                 remark: '改派车辆/司机'
               }
             ];
-            return { 
-              ...task, 
+            return {
+              ...task,
               vehicleId: action.payload.vehicleId || task.vehicleId,
               driverId: action.payload.driverId || task.driverId,
+              // 同步多车辆分配：改派时更新首辆（主）车辆/司机
+              assignments: (task.assignments && task.assignments.length > 0)
+                ? task.assignments.map((a, i) => i === 0
+                    ? { vehicleId: action.payload.vehicleId || a.vehicleId, driverId: action.payload.driverId || a.driverId }
+                    : a)
+                : (action.payload.vehicleId ? [{ vehicleId: action.payload.vehicleId, driverId: action.payload.driverId }] : task.assignments),
               status: '待接收',
               history: newHistory
             };
@@ -538,6 +563,20 @@ const reducer = (state: AppState, action: Action): AppState => {
       };
     case 'ADD_AUDIT_RECORD':
       return { ...state, auditRecords: [...state.auditRecords, action.payload] };
+    case 'ADD_DISPATCHER':
+      return { ...state, dispatchers: [...state.dispatchers, action.payload] };
+    case 'UPDATE_DISPATCHER':
+      return {
+        ...state,
+        dispatchers: state.dispatchers.map((d) =>
+          d.id === action.payload.id ? { ...d, ...action.payload.data } : d,
+        ),
+      };
+    case 'DELETE_DISPATCHER':
+      return {
+        ...state,
+        dispatchers: state.dispatchers.filter((d) => d.id !== action.payload.id),
+      };
     case 'OPEN_MODAL':
       return { ...state, activeModal: action.payload.type, modalData: action.payload.data };
     case 'CLOSE_MODAL':

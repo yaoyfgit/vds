@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { 
+import {
   Calendar,
   ClipboardList,
   Plus,
@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import { cn, getTaskAbnormalRules, getAbnormalColor } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
-import type { Task } from '../../types';
+import HelpIcon from '../HelpIcon';
+import { dispatcherMobileHelpData } from '../../constants/helpData';
+import type { Task, TaskAssignment } from '../../types';
 
 interface DispatcherViewProps {
   activeTab?: string;
@@ -143,20 +145,26 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
   // 活动选择器
   const ActivitySelector = () => (
     <div className="bg-white px-4 py-3 border-b border-slate-100">
-      <div className="flex items-center gap-2">
-        <Calendar size={18} className="text-brand-600" />
-        <select
-          value={selectedActivity}
-          onChange={(e) => setSelectedActivity(e.target.value)}
-          className="text-sm font-medium text-slate-900 bg-transparent outline-none cursor-pointer"
-        >
-          {activities.filter(a => a.status !== '已结束').map(activity => (
-            <option key={activity.id} value={activity.id}>
-              {activity.name}
-            </option>
-          ))}
-        </select>
-        <ChevronRight size={16} className="text-slate-400" />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Calendar size={18} className="text-brand-600" />
+          <select
+            value={selectedActivity}
+            onChange={(e) => setSelectedActivity(e.target.value)}
+            className="text-sm font-medium text-slate-900 bg-transparent outline-none cursor-pointer"
+          >
+            {activities.filter(a => a.status !== '已结束').map(activity => (
+              <option key={activity.id} value={activity.id}>
+                {activity.name}
+              </option>
+            ))}
+          </select>
+          <ChevronRight size={16} className="text-slate-400" />
+        </div>
+        <HelpIcon 
+          helpData={dispatcherMobileHelpData['H.8.1']}
+          className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+        />
       </div>
     </div>
   );
@@ -305,8 +313,12 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
       ) : (
         <div className="space-y-2">
           {filteredTasks.map(task => {
-            const driver = drivers.find(d => d.id === task.driverId);
-            const vehicle = vehicles.find(v => v.id === task.vehicleId);
+            // 兼容多车辆分配与旧数据
+            const assignmentList = (task.assignments && task.assignments.length > 0)
+              ? task.assignments
+              : (task.vehicleId ? [{ vehicleId: task.vehicleId, driverId: task.driverId }] : []);
+            const driverNames = assignmentList.map(a => drivers.find(d => d.id === a.driverId)?.name).filter(Boolean);
+            const vehiclePlates = assignmentList.map(a => vehicles.find(v => v.id === a.vehicleId)?.plateNumber).filter(Boolean);
             const abnormalRules = getTaskAbnormalRules(task);
             const abnormalColor = abnormalRules.length > 0 ? getAbnormalColor(abnormalRules[0].code) : null;
             
@@ -367,11 +379,11 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                   <span className="truncate max-w-[80px]">{task.to}</span>
                 </div>
 
-                {(driver || vehicle || (task.status === '待派发' && !task.vehicleId && !task.driverId)) && (
-                  <div className="flex items-center gap-3 text-xs text-slate-400 mt-2">
-                    {driver && <span>{driver.name}</span>}
-                    {vehicle && <span>· {vehicle.plateNumber}</span>}
-                    {!driver && !vehicle && task.status === '待派发' && (
+                {(driverNames.length > 0 || vehiclePlates.length > 0 || (task.status === '待派发' && assignmentList.length === 0)) && (
+                  <div className="flex items-center gap-3 text-xs text-slate-400 mt-2 flex-wrap">
+                    {driverNames.length > 0 && <span>{driverNames.join('、')}</span>}
+                    {vehiclePlates.length > 0 && <span>· {vehiclePlates.join('、')}</span>}
+                    {assignmentList.length === 0 && task.status === '待派发' && (
                       <span className="text-red-500 font-medium">未分配</span>
                     )}
                   </div>
@@ -845,18 +857,51 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
       passengerPhone: '',
       passengerCount: '',
       description: '',
-      vehicleId: '',
-      driverId: '',
+      // 多车辆分配：每辆车单独分配司机（点击公共检索结果追加）
+      assignments: [] as TaskAssignment[],
       fieldDispatcher: '当前用户'
     });
-
+    // 公共车辆检索条件（车型、车牌号，不含核载人数）；检索条件变更不影响已添加的车辆
+    const [vehicleTypeFilter, setVehicleTypeFilter] = useState('');
+    const [vehiclePlateFilter, setVehiclePlateFilter] = useState('');
     const handleSubmit = () => {
       if (!formData.name || !formData.from || !formData.to) {
         alert('请填写必填项');
         return;
       }
 
-      const isAssigned = formData.vehicleId && formData.driverId;
+      // 构建并校验多车辆分配
+      const rawAssignments = (formData.assignments || []).filter(a => a.vehicleId);
+      for (let i = 0; i < rawAssignments.length; i++) {
+        if (!rawAssignments[i].driverId) {
+          const v = vehicles.find(vv => vv.id === rawAssignments[i].vehicleId);
+          alert(`请为车辆 ${v?.plateNumber || '第' + (i + 1) + '辆'} 分配司机，或删除该车辆`);
+          return;
+        }
+      }
+      const vIds = rawAssignments.map(a => a.vehicleId);
+      const dIds = rawAssignments.map(a => a.driverId).filter(Boolean);
+      if (new Set(vIds).size !== vIds.length) {
+        alert('存在重复分配的车辆');
+        return;
+      }
+      if (new Set(dIds).size !== dIds.length) {
+        alert('存在重复分配的司机');
+        return;
+      }
+      // 驾照匹配校验
+      const licenseOrder = ['C1', 'C2', 'B1', 'B2', 'A1', 'A2'];
+      for (const a of rawAssignments) {
+        const v = vehicles.find(vv => vv.id === a.vehicleId);
+        const d = drivers.find(dd => dd.id === a.driverId);
+        if (v && d && licenseOrder.indexOf(d.licenseType) < licenseOrder.indexOf(v.licenseRequired)) {
+          alert(`司机 ${d.name} 的驾照类型不满足车辆 ${v.plateNumber} 的要求`);
+          return;
+        }
+      }
+
+      const assignments = rawAssignments.map(a => ({ vehicleId: a.vehicleId, driverId: a.driverId }));
+      const allAssigned = assignments.length > 0 && assignments.every(a => a.vehicleId && a.driverId);
       const newTask: Task = {
         id: Math.random().toString(36).substr(2, 9),
         activityId: selectedActivity,
@@ -871,15 +916,16 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
         passengerPhone: formData.passengerPhone,
         passengerCount: formData.passengerCount ? parseInt(formData.passengerCount) : undefined,
         description: formData.description,
-        vehicleId: formData.vehicleId || undefined,
-        driverId: formData.driverId || undefined,
+        assignments: assignments.length ? assignments : undefined,
+        vehicleId: assignments[0]?.vehicleId,
+        driverId: assignments[0]?.driverId,
         fieldDispatcher: formData.fieldDispatcher,
-        status: isAssigned ? '待接收' : '待派发',
+        status: allAssigned ? '待接收' : '待派发',
         history: [{
-          status: isAssigned ? '待接收' : '待派发',
+          status: allAssigned ? '待接收' : '待派发',
           time: new Date().toISOString(),
           operator: '调度员',
-          remark: isAssigned ? '创建任务并分配' : '创建任务'
+          remark: allAssigned ? '创建任务并分配' : '创建任务'
         }]
       };
 
@@ -892,9 +938,15 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
         <div className="bg-white rounded-t-3xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-slate-900">新建任务</h3>
-            <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
-              <XCircle size={24} />
-            </button>
+            <div className="flex items-center gap-1">
+              <HelpIcon 
+                helpData={dispatcherMobileHelpData['H.8.2']}
+                className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              />
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                <XCircle size={24} />
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -1004,42 +1056,164 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">分配车辆</label>
-              <select
-                value={formData.vehicleId}
-                onChange={(e) => setFormData({...formData, vehicleId: e.target.value})}
-                className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
-              >
-                <option value="">请选择车辆</option>
-                {vehicles.filter(v => v.status === '可调配').map(vehicle => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.plateNumber} - {vehicle.brand} ({vehicle.type})
-                  </option>
-                ))}
-              </select>
-            </div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                车辆与司机分配 <span className="text-xs text-slate-400">(每辆车单独分配司机)</span>
+              </label>
+              <div className="space-y-3">
+                {/* 公共车辆检索区：车型、车牌号；检索条件变更不影响已添加的车辆 */}
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                    <Car size={14} className="text-brand-600" /> 车辆检索
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={vehicleTypeFilter}
+                      onChange={(e) => setVehicleTypeFilter(e.target.value)}
+                      className="p-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                    >
+                      <option value="">全部车型</option>
+                      {[...new Set(vehicles.map(v => v.type).filter(Boolean))].map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={vehiclePlateFilter}
+                      onChange={(e) => setVehiclePlateFilter(e.target.value)}
+                      placeholder="车牌号"
+                      className="p-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                  {/* 检索结果列表：点击结果即追加为已分配车辆行 */}
+                  {(() => {
+                    const usedVehicleIds: string[] = (formData.assignments || [])
+                      .map((a) => a.vehicleId)
+                      .filter((v): v is string => Boolean(v));
+                    const filtered = vehicles.filter(v =>
+                      v.status === '可调配' &&
+                      !usedVehicleIds.includes(v.id) &&
+                      (!vehicleTypeFilter || v.type === vehicleTypeFilter) &&
+                      (!vehiclePlateFilter || (v.plateNumber || '').toUpperCase().includes(vehiclePlateFilter.toUpperCase()))
+                    );
+                    return (
+                      <div className="border border-slate-200 rounded-xl max-h-44 overflow-y-auto bg-white">
+                        {filtered.length > 0 ? (
+                          filtered.map(v => (
+                            <div
+                              key={v.id}
+                              onClick={() => {
+                                // 点击检索结果：追加为已分配车辆行，自动带出可用且未被占用的默认司机
+                                const usedDriverIds: string[] = (formData.assignments || [])
+                                  .map((a) => a.driverId)
+                                  .filter((d): d is string => Boolean(d));
+                                let newDriverId = '';
+                                const defId = v.defaultDriverId;
+                                if (defId && !usedDriverIds.includes(defId)) {
+                                  const defDriver = drivers.find(d => d.id === defId);
+                                  if (defDriver && defDriver.status === '可调配') newDriverId = defId;
+                                }
+                                setFormData({
+                                  ...formData,
+                                  assignments: [...(formData.assignments || []), { vehicleId: v.id, driverId: newDriverId }]
+                                });
+                              }}
+                              className="p-2.5 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-brand-50 active:bg-brand-50 flex justify-between items-center"
+                            >
+                              <div>
+                                <p className="font-semibold text-slate-900 text-sm">{v.plateNumber}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  <span className="inline-block mr-2">{v.type}</span>
+                                  <span className="inline-block">{v.brand}</span>
+                                </p>
+                              </div>
+                              <span className="text-brand-600 text-xs font-medium flex items-center gap-0.5">
+                                <Plus size={12} /> 添加
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-3 text-center text-slate-400 text-sm">暂无符合条件的车辆</div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <p className="text-xs text-slate-400">点击检索结果即可添加为分配车辆，再维护对应司机；重新检索不影响已添加的车辆。</p>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">分配司机</label>
-              <select
-                value={formData.driverId}
-                onChange={(e) => setFormData({...formData, driverId: e.target.value})}
-                className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
-              >
-                <option value="">请选择司机</option>
-                {drivers.filter(d => d.status === '可调配').map(driver => (
-                  <option key={driver.id} value={driver.id}>
-                    {driver.name} - {driver.phone}
-                  </option>
-                ))}
-              </select>
+                {/* 已分配车辆行：只读卡片 + 司机选择 + 删除 */}
+                {(formData.assignments || []).map((assignment, index) => {
+                  const usedDriverIds: string[] = (formData.assignments || [])
+                    .map((a, i) => (i !== index ? a.driverId : null))
+                    .filter((v): v is string => Boolean(v));
+                  const vehicle = vehicles.find(v => v.id === assignment.vehicleId);
+                  return (
+                    <div key={index} className="border border-brand-200 rounded-xl p-3 space-y-2 bg-brand-50/30">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-600">车辆 {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({
+                            ...formData,
+                            assignments: (formData.assignments || []).filter((_, i) => i !== index)
+                          })}
+                          className="text-red-500 text-xs"
+                        >
+                          删除
+                        </button>
+                      </div>
+                      {/* 已选车辆卡片（只读） */}
+                      {vehicle && (
+                        <div className="border-2 border-brand-300 bg-brand-50 rounded-xl p-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">已选择</span>
+                              <p className="font-bold text-slate-900 text-base mt-1">{vehicle.plateNumber}</p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                <span className="inline-block mr-2">{vehicle.type}</span>
+                                <span className="inline-block">{vehicle.brand}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* 司机选择 */}
+                      <select
+                        value={assignment.driverId || ''}
+                        onChange={(e) => {
+                          const newAssignments = [...(formData.assignments || [])];
+                          newAssignments[index] = { ...newAssignments[index], driverId: e.target.value };
+                          setFormData({ ...formData, assignments: newAssignments });
+                        }}
+                        className="w-full p-3 rounded-xl border border-slate-200 bg-white focus:border-brand-500 focus:outline-none text-sm"
+                      >
+                        <option value="">请选择司机</option>
+                        {drivers.filter(d =>
+                          (d.status === '可调配' || d.id === assignment.driverId) &&
+                          !usedDriverIds.includes(d.id)
+                        ).map(driver => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.name} - {driver.phone}
+                          </option>
+                        ))}
+                      </select>
+                      {!assignment.driverId && (
+                        <p className="text-xs text-red-500">请为该车辆分配司机</p>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {(formData.assignments || []).length === 0 && (
+                  <p className="text-center text-xs text-slate-400 py-4">点击上方检索结果添加车辆</p>
+                )}
+              </div>
             </div>
 
             <button
               onClick={handleSubmit}
               className="w-full bg-gradient-to-r from-brand-600 to-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:from-brand-700 hover:to-blue-700 transition-all shadow-md shadow-brand-200"
             >
-              {formData.vehicleId && formData.driverId ? '创建并派发任务' : '创建任务'}
+              {(formData.assignments || []).length > 0 && (formData.assignments || []).every(a => a.vehicleId && a.driverId) ? '创建并派发任务' : '创建任务'}
             </button>
           </div>
         </div>

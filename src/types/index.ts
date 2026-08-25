@@ -7,6 +7,7 @@ export type VehicleType = '轿车' | 'SUV' | '商务车' | '中巴' | '大巴';
 export type LicenseType = 'A1' | 'A2' | 'A3' | 'B1' | 'B2' | 'C1' | 'C2';
 export type SupplierType = '租车公司' | '客运公司' | '个人车主' | '其他';
 export type SupplierStatus = '合作中' | '暂停合作' | '已终止';
+export type DispatcherStatus = '可用' | '禁用';
 
 export interface WorkGroup {
   id: string;
@@ -35,6 +36,15 @@ export interface AuditRecord {
   auditTime: string;
 }
 
+export interface SupplierAttachment {
+  id: string;
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  uploadTime: string;
+  fileType: 'pdf' | 'doc' | 'docx' | 'xls' | 'xlsx' | 'zip' | 'rar' | 'jpg' | 'jpeg' | 'png';
+}
+
 export interface Supplier {
   id: string;
   name: string;
@@ -51,9 +61,9 @@ export interface Supplier {
   notes?: string;
   createdAt: string;
   attachments?: {
-    contractFiles: string[];
-    qualificationFiles: string[];
-    otherFiles: string[];
+    contractFiles: SupplierAttachment[];
+    qualificationFiles: SupplierAttachment[];
+    otherFiles: SupplierAttachment[];
   };
 }
 
@@ -130,6 +140,12 @@ export interface Driver {
   };
 }
 
+// 任务车辆-司机分配单元（支持单任务多车辆，每辆车单独分配司机）
+export interface TaskAssignment {
+  vehicleId: string;
+  driverId?: string;
+}
+
 export interface Task {
   id: string;
   activityId: string;
@@ -147,8 +163,11 @@ export interface Task {
   passengerPhone?: string;
   passengerCount?: number;
   description?: string;
+  // 兼容旧数据/单车主分配：表示主（首辆）车辆与司机
   vehicleId?: string;
   driverId?: string;
+  // 多车辆分配：每辆车单独分配一名司机；存在时以该字段为权威数据源
+  assignments?: TaskAssignment[];
   fieldDispatcher?: string;
   fieldDispatcherPhone?: string;
   status: TaskStatus;
@@ -165,4 +184,16 @@ export interface Task {
     operator?: string;
     remark?: string;
   }[];
+}
+
+export interface Dispatcher {
+  id: string;
+  unitName: string;
+  name: string;
+  phone: string;
+  activityId: string;
+  position: string;
+  idCardNumber?: string;
+  status: DispatcherStatus;
+  createdAt?: string;
 }

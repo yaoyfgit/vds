@@ -1,4 +1,4 @@
-import type { Activity, Vehicle, Driver, Task, Supplier, AuditRecord, WorkGroup } from '../types';
+import type { Activity, Vehicle, Driver, Task, Supplier, AuditRecord, WorkGroup, Dispatcher } from '../types';
 
 // 系统账号列表（用于模糊搜索）
 export const systemAccounts = [
@@ -58,7 +58,20 @@ export const suppliers: Supplier[] = [
     status: '合作中',
     contractNumber: 'HT-2024-001',
     notes: '长期合作供应商',
-    createdAt: '2024-01-01'
+    createdAt: '2024-01-01',
+    attachments: {
+      contractFiles: [
+        { id: 'ca-1', fileName: '合作协议2024.pdf', filePath: 'supplier/sup-1/contract/agreement.pdf', fileSize: 2048000, uploadTime: '2024-01-01 10:00:00', fileType: 'pdf' },
+        { id: 'ca-2', fileName: '补充协议.docx', filePath: 'supplier/sup-1/contract/addendum.docx', fileSize: 512000, uploadTime: '2024-06-15 14:30:00', fileType: 'docx' }
+      ],
+      qualificationFiles: [
+        { id: 'qa-1', fileName: '营业执照.png', filePath: 'supplier/sup-1/qualification/license.png', fileSize: 1024000, uploadTime: '2024-01-01 10:05:00', fileType: 'png' },
+        { id: 'qa-2', fileName: '道路运输许可证.pdf', filePath: 'supplier/sup-1/qualification/transport.pdf', fileSize: 1536000, uploadTime: '2024-01-01 10:06:00', fileType: 'pdf' }
+      ],
+      otherFiles: [
+        { id: 'oa-1', fileName: '公司资质文件.zip', filePath: 'supplier/sup-1/other/certificates.zip', fileSize: 5120000, uploadTime: '2024-01-02 09:00:00', fileType: 'zip' }
+      ]
+    }
   },
   {
     id: 'sup-2',
@@ -71,7 +84,17 @@ export const suppliers: Supplier[] = [
     contractStartDate: '2024-06-01',
     status: '合作中',
     contractNumber: 'HT-2024-005',
-    createdAt: '2024-06-01'
+    createdAt: '2024-06-01',
+    attachments: {
+      contractFiles: [
+        { id: 'cb-1', fileName: '租赁合同.pdf', filePath: 'supplier/sup-2/contract/lease.pdf', fileSize: 1792000, uploadTime: '2024-06-01 11:00:00', fileType: 'pdf' }
+      ],
+      qualificationFiles: [
+        { id: 'qb-1', fileName: '营业执照.jpg', filePath: 'supplier/sup-2/qualification/license.jpg', fileSize: 768000, uploadTime: '2024-06-01 11:05:00', fileType: 'jpg' },
+        { id: 'qb-2', fileName: '税务登记证.png', filePath: 'supplier/sup-2/qualification/tax.png', fileSize: 896000, uploadTime: '2024-06-01 11:06:00', fileType: 'png' }
+      ],
+      otherFiles: []
+    }
   },
   {
     id: 'sup-3',
@@ -85,7 +108,20 @@ export const suppliers: Supplier[] = [
     contractEndDate: '2026-12-31',
     status: '合作中',
     contractNumber: 'HT-2023-001',
-    createdAt: '2023-01-01'
+    createdAt: '2023-01-01',
+    attachments: {
+      contractFiles: [
+        { id: 'cc-1', fileName: '年度合作协议.pdf', filePath: 'supplier/sup-3/contract/annual.pdf', fileSize: 3072000, uploadTime: '2023-01-01 09:00:00', fileType: 'pdf' }
+      ],
+      qualificationFiles: [
+        { id: 'qc-1', fileName: '营业执照.jpeg', filePath: 'supplier/sup-3/qualification/license.jpeg', fileSize: 640000, uploadTime: '2023-01-01 09:05:00', fileType: 'jpeg' },
+        { id: 'qc-2', fileName: '客运经营许可证.pdf', filePath: 'supplier/sup-3/qualification/operation.pdf', fileSize: 2048000, uploadTime: '2023-01-01 09:06:00', fileType: 'pdf' },
+        { id: 'qc-3', fileName: '车辆清单.xlsx', filePath: 'supplier/sup-3/qualification/vehicles.xlsx', fileSize: 256000, uploadTime: '2023-01-01 09:07:00', fileType: 'xlsx' }
+      ],
+      otherFiles: [
+        { id: 'oc-1', fileName: '安全承诺书.pdf', filePath: 'supplier/sup-3/other/safety.pdf', fileSize: 512000, uploadTime: '2023-01-02 10:00:00', fileType: 'pdf' }
+      ]
+    }
   },
   {
     id: 'sup-4',
@@ -99,7 +135,16 @@ export const suppliers: Supplier[] = [
     status: '暂停合作',
     contractNumber: 'HT-2025-002',
     notes: '服务质量问题暂停合作',
-    createdAt: '2025-01-01'
+    createdAt: '2025-01-01',
+    attachments: {
+      contractFiles: [
+        { id: 'cd-1', fileName: '合作协议2025.pdf', filePath: 'supplier/sup-4/contract/agreement.pdf', fileSize: 1536000, uploadTime: '2025-01-01 10:00:00', fileType: 'pdf' }
+      ],
+      qualificationFiles: [
+        { id: 'qd-1', fileName: '营业执照.jpg', filePath: 'supplier/sup-4/qualification/license.jpg', fileSize: 896000, uploadTime: '2025-01-01 10:05:00', fileType: 'jpg' }
+      ],
+      otherFiles: []
+    }
   },
   {
     id: 'sup-5',
@@ -109,7 +154,12 @@ export const suppliers: Supplier[] = [
     contactPhone: '13500135001',
     contractStartDate: '2024-03-01',
     status: '合作中',
-    createdAt: '2024-03-01'
+    createdAt: '2024-03-01',
+    attachments: {
+      contractFiles: [],
+      qualificationFiles: [],
+      otherFiles: []
+    }
   }
 ];
 
@@ -485,6 +535,75 @@ export const drivers: Driver[] = [
   }
 ];
 
+export const dispatchers: Dispatcher[] = [
+  // 陈某（同姓名+同手机，跨 2 个活动 2 条记录，用于测试"不与自己重复"）
+  {
+    id: 'disp-1',
+    unitName: '政府办',
+    name: '陈某',
+    phone: '13800001111',
+    activityId: 'act-1', // 智慧城市建设研讨会（执行期）
+    position: '现场调度员',
+    idCardNumber: '110101199001011001',
+    status: '可用',
+    createdAt: '2026-06-01T09:00:00.000Z',
+  },
+  {
+    id: 'disp-2',
+    unitName: '政府办',
+    name: '陈某',
+    phone: '13800001111',
+    activityId: 'act-2', // 企业考察团接待（筹备期）
+    position: '现场调度员',
+    idCardNumber: '110101199001011001',
+    status: '可用',
+    createdAt: '2026-06-15T09:00:00.000Z',
+  },
+  {
+    id: 'disp-3',
+    unitName: '接待办',
+    name: '李某',
+    phone: '13800002222',
+    activityId: 'act-1',
+    position: '调度科科长',
+    idCardNumber: '110101198801022002',
+    status: '可用',
+    createdAt: '2026-06-01T09:05:00.000Z',
+  },
+  {
+    id: 'disp-4',
+    unitName: '接待办',
+    name: '王某',
+    phone: '13800003333',
+    activityId: 'act-1',
+    position: '现场调度员',
+    idCardNumber: '110101199203043003',
+    status: '可用',
+    createdAt: '2026-06-01T09:10:00.000Z',
+  },
+  {
+    id: 'disp-5',
+    unitName: '会议中心',
+    name: '赵某',
+    phone: '13800004444',
+    activityId: 'act-2',
+    position: '现场调度员',
+    status: '禁用',
+    createdAt: '2026-06-15T09:00:00.000Z',
+  },
+  {
+    id: 'disp-6',
+    unitName: '政府办',
+    name: '刘某',
+    phone: '13800005555',
+    activityId: 'act-2',
+    position: '现场调度员',
+    idCardNumber: '110101199105054004',
+    status: '可用',
+    createdAt: '2026-06-16T09:00:00.000Z',
+  },
+];
+
 export const auditRecords: AuditRecord[] = [
   {
     id: 'audit-1',
@@ -686,6 +805,11 @@ export const tasks: Task[] = [
     description: '接送专家团队到会场',
     vehicleId: 'v-1',
     driverId: 'd-1',
+    // 多车辆分配：专家团5人，安排2辆车分别由李师傅、陈师傅驾驶
+    assignments: [
+      { vehicleId: 'v-1', driverId: 'd-1' },
+      { vehicleId: 'v-4', driverId: 'd-4' }
+    ],
     fieldDispatcher: '陈某',
     fieldDispatcherPhone: '13900139001',
     status: '待接收',

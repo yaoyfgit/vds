@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { cn, getTaskAbnormalRules } from '../../lib/utils';
 import { useApp, generateId } from '../../context/AppContext';
+import HelpIcon from '../../components/HelpIcon';
+import { activityHelpData } from '../../constants/helpData';
 import type { Activity, Vehicle, Driver, Task, ActivityPeriod, Supplier, WorkGroup } from '../../types';
 
 interface ActivityDetailProps {
@@ -152,9 +154,12 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({
               {activity.period}
             </span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            <HelpIcon helpData={activityHelpData['H.1.3']} />
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Period Tip */}
@@ -762,9 +767,12 @@ const ActivityWorkGroupsTab: React.FC<{
               <h3 className="text-lg font-semibold">
                 {editingWorkGroup ? '编辑工作小组' : '新建工作小组'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <HelpIcon helpData={activityHelpData['H.1.8']} />
+                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-4">
@@ -1001,8 +1009,12 @@ const ActivityTasksTab: React.FC<{
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredTasks.length > 0 ? filteredTasks.map(task => {
-              const driver = drivers.find(d => d.id === task.driverId);
-              const vehicle = vehicles.find(v => v.id === task.vehicleId);
+              // 兼容多车辆分配与旧数据
+              const assignmentList = (task.assignments && task.assignments.length > 0)
+                ? task.assignments
+                : (task.vehicleId ? [{ vehicleId: task.vehicleId, driverId: task.driverId }] : []);
+              const driverNames = assignmentList.map(a => drivers.find(d => d.id === a.driverId)?.name).filter(Boolean);
+              const vehiclePlates = assignmentList.map(a => vehicles.find(v => v.id === a.vehicleId)?.plateNumber).filter(Boolean);
               const abnormalRules = getTaskAbnormalRules(task);
               const isAbnormal = abnormalRules.length > 0;
               
@@ -1026,8 +1038,8 @@ const ActivityTasksTab: React.FC<{
                     {task.date} {task.startTime}-{task.endTime}
                   </td>
                   <td className="px-4 py-3 text-slate-600 text-sm">
-                    <div>{driver?.name || '未分配'}</div>
-                    <div className="text-xs text-slate-400">{vehicle?.plateNumber || '未分配'}</div>
+                    <div>{driverNames.length > 0 ? driverNames.join('、') : '未分配'}</div>
+                    <div className="text-xs text-slate-400">{vehiclePlates.length > 0 ? vehiclePlates.join('、') : '未分配'}</div>
                   </td>
                   <td className="px-4 py-3">
                     <span className={cn('px-2 py-1 rounded-full text-xs font-medium', statusStyles[task.status] || 'bg-slate-100 text-slate-600')}>
@@ -1209,9 +1221,12 @@ const ActivitySuppliersTab: React.FC<{
           <div className="bg-white rounded-2xl w-[600px] max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <h3 className="text-lg font-semibold">选择供应商</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <HelpIcon helpData={activityHelpData['H.1.6']} />
+                <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">

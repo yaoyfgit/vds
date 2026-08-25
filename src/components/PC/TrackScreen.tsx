@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Map, Users, Phone, Navigation, AlertTriangle, Maximize2, X, Clock } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
+import HelpIcon from '../HelpIcon';
+import { trackHelpData } from '../../constants/helpData';
 import type { Activity, Driver, Task } from '../../types';
 
 const TrackScreen: React.FC = () => {
@@ -166,16 +168,20 @@ const TrackScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* 全屏按钮 */}
-        <button
-          onClick={() => setIsFullscreen(!isFullscreen)}
-          className={cn(
-            "p-2 rounded-lg transition-colors",
-            isFullscreen ? "bg-brand-100 text-brand-600" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          )}
-        >
-          {isFullscreen ? <X size={20} /> : <Maximize2 size={20} />}
-        </button>
+        {/* 右侧操作 */}
+        <div className="flex items-center gap-2">
+          <HelpIcon helpData={trackHelpData['H.9.1']} />
+          {/* 全屏按钮 */}
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className={cn(
+              "p-2 rounded-lg transition-colors",
+              isFullscreen ? "bg-brand-100 text-brand-600" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            )}
+          >
+            {isFullscreen ? <X size={20} /> : <Maximize2 size={20} />}
+          </button>
+        </div>
       </header>
 
       {/* 主体区域 */}

@@ -22,7 +22,11 @@ try {
 
   console.log('🔧 在临时目录初始化 git...');
   execSync('git init', { cwd: tempDir, stdio: 'inherit' });
-  execSync('git checkout -b gh-pages', { cwd: tempDir, stdio: 'inherit' });
+  try {
+    execSync('git checkout gh-pages', { cwd: tempDir, stdio: 'inherit' });
+  } catch {
+    execSync('git checkout -b gh-pages', { cwd: tempDir, stdio: 'inherit' });
+  }
   execSync('git add .', { cwd: tempDir, stdio: 'inherit' });
   execSync('git config user.email "deploy@github.com"', { cwd: tempDir, stdio: 'inherit' });
   execSync('git config user.name "GitHub Actions"', { cwd: tempDir, stdio: 'inherit' });

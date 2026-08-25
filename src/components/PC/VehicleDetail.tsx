@@ -18,13 +18,16 @@ import {
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import type { Vehicle } from '../../types';
+import HelpIcon from '../../components/HelpIcon';
+import { vehicleHelpData, HelpData } from '../../constants/helpData';
 
 interface VehicleDetailProps {
   vehicle: Vehicle;
   onClose: () => void;
+  helpData?: HelpData;
 }
 
-const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
+const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose, helpData }) => {
   const { activities, vehicles, drivers, workGroups, dispatch } = useApp();
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditAction, setAuditAction] = useState<'approve' | 'reject'>('approve');
@@ -130,6 +133,7 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <HelpIcon helpData={helpData || vehicleHelpData['H.3.2']} />
                 {currentVehicle.auditStatus === '待审核' && (
                   <button
                     onClick={() => setShowAuditModal(true)}
@@ -487,9 +491,12 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
           <div className="bg-white rounded-2xl w-[500px] max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <h3 className="text-lg font-semibold">绑定默认司机</h3>
-              <button onClick={() => setShowBindDriverModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <HelpIcon helpData={vehicleHelpData['H.3.3']} />
+                <button onClick={() => setShowBindDriverModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
@@ -562,9 +569,12 @@ const VehicleDetail: React.FC<VehicleDetailProps> = ({ vehicle, onClose }) => {
           <div className="bg-white rounded-2xl w-[500px] max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <h3 className="text-lg font-semibold">绑定活动地点</h3>
-              <button onClick={() => setShowBindLocationModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <HelpIcon helpData={vehicleHelpData['H.3.4']} />
+                <button onClick={() => setShowBindLocationModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">

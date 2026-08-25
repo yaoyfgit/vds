@@ -13,7 +13,7 @@ import {
   Monitor,
   AlertCircle,
   UserPlus,
-  Map,
+  Map as MapIcon,
   Play,
   RotateCcw,
   Clock,
@@ -24,16 +24,32 @@ import {
   FileText,
   CreditCard,
   XCircle,
+  Download,
+  UploadCloud,
 } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
 import PCLayout from './components/PC/PCLayout';
 import MobileLayout from './components/Mobile/MobileLayout';
 import Modal from './components/Modal';
+import HelpIcon from './components/HelpIcon';
 import VehicleDetail from './components/PC/VehicleDetail';
 import DriverDetail from './components/PC/DriverDetail';
-import { generateId, cn, getTaskAbnormalRules } from './lib/utils';
-import type { Task, Vehicle, Driver, Activity, Supplier, ActivityStatus, ActivityPeriod, ResourceStatus, TaskStatus, AuditStatus, SupplierStatus } from './types';
+import {
+  generateId,
+  cn,
+  getTaskAbnormalRules,
+  validateDispatcherNamePhone,
+  findUnfinishedTasksForDispatcher,
+  formatUnfinishedTaskPrompt,
+  isValidChineseMobile,
+  buildDispatcherTemplateCSV,
+  downloadTextAsFile,
+  parseCSV,
+  DISPATCHER_IMPORT_HEADERS,
+} from './lib/utils';
+import type { Task, TaskAssignment, Vehicle, Driver, Activity, Supplier, ActivityStatus, ActivityPeriod, ResourceStatus, TaskStatus, AuditStatus, SupplierStatus, SupplierAttachment, Dispatcher, DispatcherStatus } from './types';
 import { systemAccounts } from './data/mockData';
+import { activityHelpData, supplierHelpData, vehicleHelpData, driverHelpData, taskHelpData, trackHelpData, dispatcherHelpData } from './constants/helpData';
 
 // Main App Component
 export default function App() {
@@ -71,7 +87,7 @@ export default function App() {
 
 // PC App with all the modal logic
 function PCApp() {
-  const { tasks, vehicles, drivers, activities, suppliers, activeModal, modalData, currentUser, dispatch } = useApp();
+  const { tasks, vehicles, drivers, activities, suppliers, dispatchers, activeModal, modalData, currentUser, dispatch } = useApp();
 
   const [formData, setFormData] = useState<any>({});
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
@@ -90,15 +106,22 @@ function PCApp() {
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [pcActiveTab, setPcActiveTab] = useState<string>('activities');
-  const [contractFiles, setContractFiles] = useState<string[]>([]);
-  const [qualificationFiles, setQualificationFiles] = useState<string[]>([]);
-  const [otherSupplierFiles, setOtherSupplierFiles] = useState<string[]>([]);
-  const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string>('');
-  const [vehicleCapacityFilter, setVehicleCapacityFilter] = useState<string>('');
+  const [contractFiles, setContractFiles] = useState<SupplierAttachment[]>([]);
+  const [qualificationFiles, setQualificationFiles] = useState<SupplierAttachment[]>([]);
+  const [otherSupplierFiles, setOtherSupplierFiles] = useState<SupplierAttachment[]>([]);
   const [activityManagers, setActivityManagers] = useState<string[]>([]);
+  // 新建任务-资源分配：公共车辆检索条件（车型、核载人数、车牌号）
+  const [taskVehicleTypeFilter, setTaskVehicleTypeFilter] = useState('');
+  const [taskVehicleCapacityFilter, setTaskVehicleCapacityFilter] = useState('');
+  const [taskVehiclePlateFilter, setTaskVehiclePlateFilter] = useState('');
   const [managerSearchQuery, setManagerSearchQuery] = useState('');
   const [showManagerSearch, setShowManagerSearch] = useState(false);
   const [managerSearchResults, setManagerSearchResults] = useState<{name: string, phone: string}[]>([]);
+  // 调度员批量导入预览
+  const [importPreview, setImportPreview] = useState<
+    { data: Record<string, string>; ok: boolean; reason?: string }[]
+  >([]);
+  const [importTruncated, setImportTruncated] = useState(false);
 
   // 搜索总调度员
   const handleManagerSearch = (query: string) => {
@@ -144,6 +167,26 @@ function PCApp() {
     }
   }, [activeModal, modalData]);
 
+  // 初始化新建/编辑任务的多车辆分配行
+  React.useEffect(() => {
+    if (activeModal === 'NEW_TASK') {
+      // 新建任务：从空开始，通过点击公共检索结果追加车辆行
+      setFormData((f: any) => (f.assignments ? f : { ...f, assignments: [] }));
+    } else if (activeModal === 'EDIT_TASK' && modalData) {
+      // 编辑任务：从已有 assignments 回填；旧数据仅有 vehicleId 时降级为单行
+      setFormData((f: any) => {
+        if (f.assignments) return f;
+        const fromExisting =
+          (modalData.assignments && modalData.assignments.length > 0)
+            ? modalData.assignments.map((a: any) => ({ vehicleId: a.vehicleId || '', driverId: a.driverId || '' }))
+            : (modalData.vehicleId
+                ? [{ vehicleId: modalData.vehicleId, driverId: modalData.driverId || '' }]
+                : []);
+        return { ...f, assignments: fromExisting };
+      });
+    }
+  }, [activeModal, modalData]);
+
   const handleClose = () => {
     dispatch({ type: 'CLOSE_MODAL' });
     setFormData({});
@@ -169,8 +212,11 @@ function PCApp() {
     setManagerSearchResults([]);
     setSelectedActivityId('');
     setSelectedSupplierId('');
-    setVehicleTypeFilter('');
-    setVehicleCapacityFilter('');
+    setTaskVehicleTypeFilter('');
+    setTaskVehicleCapacityFilter('');
+    setTaskVehiclePlateFilter('');
+    setImportPreview([]);
+    setImportTruncated(false);
   };
 
   const checkTimeConflicts = (vehicleId: string | undefined, driverId: string | undefined, taskDate: string, startTime: string, endTime: string, excludeTaskId?: string) => {
@@ -248,8 +294,65 @@ function PCApp() {
     const licenseOrder = ['C1', 'C2', 'B1', 'B2', 'A1', 'A2'];
     const vehicleLevel = licenseOrder.indexOf(vehicle.licenseRequired);
     const driverLevel = licenseOrder.indexOf(driver.licenseType);
-    
+
     return driverLevel >= vehicleLevel;
+  };
+
+  // 构建&校验多车辆分配（每辆车单独分配司机）
+  // 返回 { ok, assignments, vehicleId, driverId, error }
+  type BuildAssignmentsResult =
+    | { ok: true; assignments: TaskAssignment[]; vehicleId?: string; driverId?: string }
+    | { ok: false; error: string };
+  const buildAssignments = (formData: any): BuildAssignmentsResult => {
+    const rawAssignments: { vehicleId: string; driverId?: string }[] =
+      (formData.assignments || []).filter((a: any) => a.vehicleId);
+
+    // 每辆车必须分配司机（符合“每辆车需单独分配司机”的变更要求）
+    for (let i = 0; i < rawAssignments.length; i++) {
+      if (!rawAssignments[i].driverId) {
+        const v = vehicles.find(vv => vv.id === rawAssignments[i].vehicleId);
+        return { ok: false, error: `请为车辆 ${v?.plateNumber || '第' + (i + 1) + '辆'} 分配司机，或删除该车辆` };
+      }
+    }
+
+    // 同一任务内：车辆不可重复、司机不可重复
+    for (let i = 0; i < rawAssignments.length; i++) {
+      for (let j = i + 1; j < rawAssignments.length; j++) {
+        if (rawAssignments[i].vehicleId === rawAssignments[j].vehicleId) {
+          const v = vehicles.find(vv => vv.id === rawAssignments[i].vehicleId);
+          return { ok: false, error: `车辆 ${v?.plateNumber || ''} 在本任务中重复分配` };
+        }
+        if (rawAssignments[i].driverId && rawAssignments[i].driverId === rawAssignments[j].driverId) {
+          const d = drivers.find(dd => dd.id === rawAssignments[i].driverId);
+          return { ok: false, error: `司机 ${d?.name || ''} 在本任务中重复分配` };
+        }
+      }
+    }
+
+    // 逐对校验：时间段冲突、可用日期、驾照匹配
+    // 编辑任务时未修改的日期/时间字段以原任务数据（modalData）回退，避免误判
+    const taskDate = formData.date || modalData?.date;
+    const taskStartTime = formData.startTime || modalData?.startTime;
+    const taskEndTime = formData.endTime || modalData?.endTime;
+    for (const a of rawAssignments) {
+      const conflicts = checkTimeConflicts(a.vehicleId, a.driverId, taskDate, taskStartTime, taskEndTime);
+      if (conflicts.length) return { ok: false, error: conflicts.join('；') };
+      const dateErrors = checkAvailableDate(a.vehicleId, a.driverId, taskDate);
+      if (dateErrors.length) return { ok: false, error: dateErrors.join('；') };
+      if (!checkLicenseMatch(a.vehicleId, a.driverId)) {
+        const v = vehicles.find(vv => vv.id === a.vehicleId);
+        const d = drivers.find(dd => dd.id === a.driverId);
+        return { ok: false, error: `司机 ${d?.name} 的驾照类型不满足车辆 ${v?.plateNumber} 的要求` };
+      }
+    }
+
+    const assignments = rawAssignments.map(a => ({ vehicleId: a.vehicleId, driverId: a.driverId }));
+    return {
+      ok: true,
+      assignments,
+      vehicleId: assignments[0]?.vehicleId,
+      driverId: assignments[0]?.driverId
+    };
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -429,6 +532,12 @@ function PCApp() {
         alert('请选择所属活动');
         return;
       }
+      // 多车辆分配构建与校验（每辆车单独分配司机）
+      const built = buildAssignments(formData);
+      if (!built.ok) {
+        alert(built.error);
+        return;
+      }
       const newTask: Task = {
         id: generateId(),
         name: formData.name,
@@ -445,8 +554,9 @@ function PCApp() {
         passengerPhone: formData.passengerPhone,
         passengerCount: formData.passengerCount,
         description: formData.description,
-        vehicleId: formData.vehicleId,
-        driverId: formData.driverId,
+        vehicleId: built.vehicleId,
+        driverId: built.driverId,
+        assignments: built.assignments.length ? built.assignments : undefined,
         activityId: selectedActivityId || modalData?.id || '',
         fieldDispatcher: formData.fieldDispatcher || '当前用户',
         status: '待派发' as TaskStatus,
@@ -455,11 +565,22 @@ function PCApp() {
       dispatch({ type: 'ADD_TASK', payload: newTask });
       handleClose();
     } else if (activeModal === 'EDIT_TASK') {
+      // 编辑任务同样进行多车辆分配构建与校验
+      const built = buildAssignments(formData);
+      if (!built.ok) {
+        alert(built.error);
+        return;
+      }
       dispatch({
         type: 'UPDATE_TASK',
         payload: {
           id: modalData.id,
-          data: formData
+          data: {
+            ...formData,
+            vehicleId: built.vehicleId,
+            driverId: built.driverId,
+            assignments: built.assignments.length ? built.assignments : undefined
+          }
         }
       });
       handleClose();
@@ -607,6 +728,192 @@ function PCApp() {
         }
       });
       handleClose();
+    } else if (activeModal === 'NEW_DISPATCHER') {
+      const name = (formData.name || '').trim();
+      const phone = (formData.phone || '').trim();
+      const activityId = formData.activityId as string | undefined;
+      const unitName = (formData.unitName || '').trim();
+      const position = (formData.position || '').trim();
+
+      if (!unitName) {
+        alert('请输入单位名称');
+        return;
+      }
+      if (!name) {
+        alert('请输入调度员姓名');
+        return;
+      }
+      if (!isValidChineseMobile(phone)) {
+        alert('请输入有效手机号');
+        return;
+      }
+      if (!activityId) {
+        alert('请选择所属活动');
+        return;
+      }
+      if (!position) {
+        alert('请输入职务');
+        return;
+      }
+
+      const namePhoneCheck = validateDispatcherNamePhone(dispatchers, name, phone);
+      if (!namePhoneCheck.ok) {
+        alert(namePhoneCheck.message);
+        return;
+      }
+
+      const newDispatcher: Dispatcher = {
+        id: generateId(),
+        unitName,
+        name,
+        phone,
+        activityId,
+        position,
+        idCardNumber: (formData.idCardNumber || '').trim() || undefined,
+        status: '可用',
+        createdAt: new Date().toISOString(),
+      };
+      dispatch({ type: 'ADD_DISPATCHER', payload: newDispatcher });
+      handleClose();
+    } else if (activeModal === 'EDIT_DISPATCHER') {
+      const existing: Dispatcher | undefined = modalData;
+      if (!existing) {
+        handleClose();
+        return;
+      }
+      const targetStatus = formData.status as DispatcherStatus | undefined;
+
+      // 若将状态切为禁用 → 未结束任务校验
+      if (
+        targetStatus === '禁用' &&
+        existing.status !== '禁用'
+      ) {
+        const unfinished = findUnfinishedTasksForDispatcher(
+          tasks,
+          activities,
+          formData.name ?? existing.name,
+          formData.phone ?? existing.phone,
+        );
+        if (unfinished.length > 0) {
+          dispatch({
+            type: 'OPEN_MODAL',
+            payload: {
+              type: 'DISPATCHER_ALERT',
+              data: { message: formatUnfinishedTaskPrompt(unfinished, '修改') },
+            },
+          });
+          return;
+        }
+      }
+
+      const newName = (formData.name ?? existing.name).trim();
+      const newPhone = (formData.phone ?? existing.phone).trim();
+      // 手机号格式
+      if (!isValidChineseMobile(newPhone)) {
+        alert('请输入有效手机号');
+        return;
+      }
+      // 姓名/手机号冲突
+      const namePhoneCheck = validateDispatcherNamePhone(
+        dispatchers,
+        newName,
+        newPhone,
+        existing.id,
+      );
+      if (!namePhoneCheck.ok) {
+        alert(namePhoneCheck.message);
+        return;
+      }
+
+      const patch: Partial<Dispatcher> = {
+        unitName: (formData.unitName ?? existing.unitName).trim(),
+        name: newName,
+        phone: newPhone,
+        position: (formData.position ?? existing.position).trim(),
+        // idCardNumber：若表单中曾写入过（包括被清空为''），尊重表单值（空→undefined）
+        // 若表单中从未碰过，则保留原值
+        idCardNumber: 'idCardNumber' in formData
+          ? ((formData.idCardNumber as string | undefined) ?? '').trim() || undefined
+          : existing.idCardNumber,
+      };
+      if (targetStatus) patch.status = targetStatus;
+      // 所属活动不可修改 → 不 patch activityId
+
+      dispatch({ type: 'UPDATE_DISPATCHER', payload: { id: existing.id, data: patch } });
+      handleClose();
+    } else if (activeModal === 'DELETE_DISPATCHER') {
+      // H.10.4: 删除确认框的"确认"按钮
+      // 未结束任务校验已在点击列表"删除"按钮时完成（H.10.1），此处直接执行删除
+      const target: Dispatcher | undefined = modalData;
+      if (!target) {
+        handleClose();
+        return;
+      }
+      dispatch({
+        type: 'DELETE_DISPATCHER',
+        payload: { id: target.id },
+      });
+      handleClose();
+    } else if (activeModal === 'IMPORT_DISPATCHERS') {
+      const successRows = importPreview.filter((r) => r.ok);
+      if (successRows.length === 0) {
+        alert('无有效数据可导入');
+        return;
+      }
+
+      const activityNameToId = new Map(activities.map((a) => [a.name, a.id] as [string, string]));
+
+      let baseDispatchers = dispatchers;
+      let importedCount = 0;
+      const skippedReasons: { name: string; phone: string; reason: string }[] = [];
+      for (const row of successRows) {
+        const d = row.data;
+        const name = (d['调度员姓名'] || '').trim();
+        const phone = (d['手机号'] || '').trim();
+        const activityName = (d['所属活动名称'] || '').trim();
+        const activityId = activityNameToId.get(activityName);
+        if (!activityId) {
+          skippedReasons.push({ name, phone, reason: `活动"${activityName}"不存在（可能在预览后被删除或进入结束期）` });
+          continue;
+        }
+
+        const nameCheck = validateDispatcherNamePhone(baseDispatchers, name, phone, undefined, 'batch');
+        if (!nameCheck.ok) {
+          skippedReasons.push({ name, phone, reason: nameCheck.message });
+          continue;
+        }
+
+        const newDisp: Dispatcher = {
+          id: generateId(),
+          unitName: (d['单位名称'] || '').trim(),
+          name,
+          phone,
+          activityId,
+          position: (d['职务'] || '').trim(),
+          idCardNumber: (d['身份证号'] || '').trim() || undefined,
+          status: '可用',
+          createdAt: new Date().toISOString(),
+        };
+        dispatch({ type: 'ADD_DISPATCHER', payload: newDisp });
+        importedCount += 1;
+        // 对同批次防重复（避免导入 2 条同一手机+不同姓名），按顺序追加到临时列表
+        baseDispatchers = [...baseDispatchers, newDisp];
+      }
+      if (skippedReasons.length > 0) {
+        const uniqReasons = Array.from(new Set(skippedReasons.map((s) => s.reason)));
+        const top = skippedReasons
+          .slice(0, 3)
+          .map((s) => `· ${s.name}（${s.phone}）：${s.reason}`)
+          .join('\n');
+        alert(
+          `导入完成：成功 ${importedCount} 条，跳过 ${skippedReasons.length} 条。\n\n跳过原因概览：\n${top}${
+            skippedReasons.length > 3 ? `\n... 等共 ${skippedReasons.length} 条` : ''
+          }\n\n原因类型：${uniqReasons.join('；')}`,
+        );
+      } else if (importedCount > 0) {
+        alert(`导入完成：成功导入 ${importedCount} 条调度员`);
+      }
+      handleClose();
     }
   };
 
@@ -624,7 +931,7 @@ function PCApp() {
         }}
       />
       
-      <Modal isOpen={activeModal === 'NEW_ACTIVITY' || activeModal === 'EDIT_ACTIVITY'} onClose={handleClose} title={activeModal === 'NEW_ACTIVITY' ? '新建活动' : '编辑活动'}>
+      <Modal isOpen={activeModal === 'NEW_ACTIVITY' || activeModal === 'EDIT_ACTIVITY'} onClose={handleClose} title={activeModal === 'NEW_ACTIVITY' ? '新建活动' : '编辑活动'} helpData={activityHelpData['H.1.2']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -1069,7 +1376,7 @@ function PCApp() {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'NEW_VEHICLE' || activeModal === 'EDIT_VEHICLE'} onClose={handleClose} title={activeModal === 'NEW_VEHICLE' ? '新增车辆' : '编辑车辆'} size="xl">
+      <Modal isOpen={activeModal === 'NEW_VEHICLE' || activeModal === 'EDIT_VEHICLE'} onClose={handleClose} title={activeModal === 'NEW_VEHICLE' ? '新增车辆' : '编辑车辆'} size="xl" helpData={vehicleHelpData['H.3.2']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 活动选择 */}
           {activeModal === 'NEW_VEHICLE' && (
@@ -1447,7 +1754,7 @@ function PCApp() {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'NEW_DRIVER' || activeModal === 'EDIT_DRIVER'} onClose={handleClose} title={activeModal === 'NEW_DRIVER' ? '新增司机' : '编辑司机'} size="xl">
+      <Modal isOpen={activeModal === 'NEW_DRIVER' || activeModal === 'EDIT_DRIVER'} onClose={handleClose} title={activeModal === 'NEW_DRIVER' ? '新增司机' : '编辑司机'} size="xl" helpData={driverHelpData['H.4.2']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 活动选择 */}
           {activeModal === 'NEW_DRIVER' && (
@@ -1802,7 +2109,7 @@ function PCApp() {
       </Modal>
 
       {/* 新增供应商 Modal */}
-      <Modal isOpen={activeModal === 'NEW_SUPPLIER'} onClose={handleClose} title="新增供应商" size="xl">
+      <Modal isOpen={activeModal === 'NEW_SUPPLIER'} onClose={handleClose} title="新增供应商" size="xl" helpData={supplierHelpData['H.2.2']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1949,9 +2256,9 @@ function PCApp() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-500 mb-1">合同文件</label>
               <div className="flex gap-2 flex-wrap">
-                {contractFiles.map((_, index) => (
+                {contractFiles.map((file, index) => (
                   <div
-                    key={index}
+                    key={file.id || index}
                     className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <FileText size={24} className="text-slate-400" />
@@ -1970,7 +2277,7 @@ function PCApp() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setContractFiles([...contractFiles, ''])}
+                  onClick={() => setContractFiles([...contractFiles, { id: `cf-${Date.now()}`, fileName: `合同文件${contractFiles.length + 1}.pdf`, filePath: '', fileSize: 0, uploadTime: new Date().toLocaleString(), fileType: 'pdf' }])}
                   className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
                 >
                   <Plus size={24} />
@@ -1981,9 +2288,9 @@ function PCApp() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-500 mb-1">资质文件</label>
               <div className="flex gap-2 flex-wrap">
-                {qualificationFiles.map((_, index) => (
+                {qualificationFiles.map((file, index) => (
                   <div
-                    key={index}
+                    key={file.id || index}
                     className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <FileText size={24} className="text-slate-400" />
@@ -2002,7 +2309,7 @@ function PCApp() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setQualificationFiles([...qualificationFiles, ''])}
+                  onClick={() => setQualificationFiles([...qualificationFiles, { id: `qf-${Date.now()}`, fileName: `资质文件${qualificationFiles.length + 1}.png`, filePath: '', fileSize: 0, uploadTime: new Date().toLocaleString(), fileType: 'png' }])}
                   className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
                 >
                   <Plus size={24} />
@@ -2013,9 +2320,9 @@ function PCApp() {
             <div>
               <label className="block text-sm font-medium text-slate-500 mb-1">其他文件</label>
               <div className="flex gap-2 flex-wrap">
-                {otherSupplierFiles.map((_, index) => (
+                {otherSupplierFiles.map((file, index) => (
                   <div
-                    key={index}
+                    key={file.id || index}
                     className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <FileText size={24} className="text-slate-400" />
@@ -2034,7 +2341,7 @@ function PCApp() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setOtherSupplierFiles([...otherSupplierFiles, ''])}
+                  onClick={() => setOtherSupplierFiles([...otherSupplierFiles, { id: `of-${Date.now()}`, fileName: `其他文件${otherSupplierFiles.length + 1}.pdf`, filePath: '', fileSize: 0, uploadTime: new Date().toLocaleString(), fileType: 'pdf' }])}
                   className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
                 >
                   <Plus size={24} />
@@ -2049,7 +2356,7 @@ function PCApp() {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'NEW_TASK' || activeModal === 'EDIT_TASK'} onClose={handleClose} title={activeModal === 'NEW_TASK' ? '新建任务' : '编辑任务'} size="xl">
+      <Modal isOpen={activeModal === 'NEW_TASK' || activeModal === 'EDIT_TASK'} onClose={handleClose} title={activeModal === 'NEW_TASK' ? '新建任务' : '编辑任务'} size="xl" helpData={taskHelpData['H.6.2']}>
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* 活动选择 */}
           {activeModal === 'NEW_TASK' && (
@@ -2341,127 +2648,183 @@ function PCApp() {
               </div>
             </div>
           </div>
-          
-          {/* 资源分配 */}
+
+          {/* 资源分配 - 多车辆，每辆车单独分配司机 */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
               <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
                 <Car size={16} className="text-brand-600" />
                 资源分配
+                <span className="text-xs font-normal text-slate-400">支持多车辆，每辆车单独分配司机</span>
               </h4>
             </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">分配车辆</label>
-                {formData.vehicleId ? (
-                  // 已选中车辆时的展示
-                  <div className="border-2 border-brand-300 bg-brand-50 rounded-xl p-4">
-                    {(() => {
-                      const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
-                      return selectedVehicle ? (
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">已选择</span>
-                            </div>
-                            <p className="font-bold text-slate-900 text-lg">{selectedVehicle.plateNumber}</p>
-                            <p className="text-sm text-slate-500 mt-1">
-                              <span className="inline-block mr-2">{selectedVehicle.type}</span>
-                              <span className="inline-block mr-2">{selectedVehicle.capacity}座</span>
-                              <span className="inline-block">{selectedVehicle.brand}</span>
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => setFormData({ ...formData, vehicleId: '' })}
-                            className="text-slate-400 hover:text-slate-600 p-1"
-                            title="更换车辆"
-                          >
-                            <X size={20} />
-                          </button>
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                ) : (
-                  // 未选中时显示筛选和列表
-                  <>
-                    {/* 筛选条件 */}
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <select
-                        value={vehicleTypeFilter}
-                        onChange={(e) => setVehicleTypeFilter(e.target.value)}
-                        className="p-2.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                      >
-                        <option value="">全部车型</option>
-                        {[...new Set(vehicles.map(v => v.type).filter(Boolean))].map(type => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={vehicleCapacityFilter}
-                        onChange={(e) => setVehicleCapacityFilter(e.target.value)}
-                        className="p-2.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                      >
-                        <option value="">全部核载人数</option>
-                        {[...new Set(vehicles.map(v => v.capacity).filter(Boolean))].sort((a, b) => Number(a) - Number(b)).map(cap => (
-                          <option key={cap} value={cap}>{cap}座</option>
-                        ))}
-                      </select>
-                    </div>
-                    {/* 车辆列表 */}
-                    <div className="border border-slate-200 rounded-xl max-h-48 overflow-y-auto">
-                      {vehicles.filter(v => 
-                        (v.status === '可调配' || v.id === modalData?.vehicleId) &&
-                        (!vehicleTypeFilter || v.type === vehicleTypeFilter) &&
-                        (!vehicleCapacityFilter || v.capacity === Number(vehicleCapacityFilter))
-                      ).length > 0 ? (
-                        vehicles.filter(v => 
-                          (v.status === '可调配' || v.id === modalData?.vehicleId) &&
-                          (!vehicleTypeFilter || v.type === vehicleTypeFilter) &&
-                          (!vehicleCapacityFilter || v.capacity === Number(vehicleCapacityFilter))
-                        ).map(v => (
+            <div className="p-4 space-y-3">
+              {/* 公共车辆检索区：车型、核载人数、车牌号；检索条件变更不影响已添加的车辆 */}
+              <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                  <Car size={14} className="text-brand-600" /> 车辆检索
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    value={taskVehicleTypeFilter}
+                    onChange={(e) => setTaskVehicleTypeFilter(e.target.value)}
+                    className="p-2 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 outline-none"
+                  >
+                    <option value="">全部车型</option>
+                    {[...new Set(vehicles.map(v => v.type).filter(Boolean))].map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={taskVehicleCapacityFilter}
+                    onChange={(e) => setTaskVehicleCapacityFilter(e.target.value)}
+                    className="p-2 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 outline-none"
+                  >
+                    <option value="">全部核载</option>
+                    {[...new Set(vehicles.map(v => v.capacity).filter(Boolean))].sort((a, b) => a - b).map(cap => (
+                      <option key={cap} value={String(cap)}>{cap}人</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={taskVehiclePlateFilter}
+                    onChange={(e) => setTaskVehiclePlateFilter(e.target.value)}
+                    placeholder="车牌号"
+                    className="p-2 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 outline-none"
+                  />
+                </div>
+                {/* 检索结果列表：点击结果即追加为已分配车辆行 */}
+                {(() => {
+                  const usedVehicleIds: string[] = (formData.assignments || [])
+                    .map((a: any) => a.vehicleId)
+                    .filter(Boolean);
+                  const filtered = vehicles.filter(v =>
+                    v.status === '可调配' &&
+                    !usedVehicleIds.includes(v.id) &&
+                    (!taskVehicleTypeFilter || v.type === taskVehicleTypeFilter) &&
+                    (!taskVehicleCapacityFilter || String(v.capacity) === taskVehicleCapacityFilter) &&
+                    (!taskVehiclePlateFilter || (v.plateNumber || '').toUpperCase().includes(taskVehiclePlateFilter.toUpperCase()))
+                  );
+                  return (
+                    <div className="border border-slate-200 rounded-lg max-h-56 overflow-y-auto bg-white">
+                      {filtered.length > 0 ? (
+                        filtered.map(v => (
                           <div
                             key={v.id}
-                            onClick={() => setFormData({ ...formData, vehicleId: v.id })}
-                            className="p-3 border-b border-slate-100 cursor-pointer hover:bg-slate-50 last:border-b-0 transition-colors"
+                            onClick={() => {
+                              // 点击检索结果：追加为已分配车辆行，自动带出可用且未被占用的默认司机
+                              const usedDriverIds: string[] = (formData.assignments || [])
+                                .map((a: any) => a.driverId)
+                                .filter(Boolean);
+                              let newDriverId = '';
+                              const defId = v.defaultDriverId;
+                              if (defId && !usedDriverIds.includes(defId)) {
+                                const defDriver = drivers.find(d => d.id === defId);
+                                if (defDriver && defDriver.status === '可调配') newDriverId = defId;
+                              }
+                              setFormData({
+                                ...formData,
+                                assignments: [...(formData.assignments || []), { vehicleId: v.id, driverId: newDriverId }]
+                              });
+                            }}
+                            className="p-2.5 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-brand-50 flex justify-between items-center"
                           >
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-semibold text-slate-900">{v.plateNumber}</p>
-                                <p className="text-xs text-slate-500 mt-1">
-                                  <span className="inline-block mr-2">{v.type}</span>
-                                  <span className="inline-block mr-2">{v.capacity}座</span>
-                                  <span className="inline-block">{v.brand}</span>
-                                </p>
-                              </div>
-                              <span className={cn(
-                                "px-2 py-0.5 rounded text-xs font-medium",
-                                v.status === '可调配' ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
-                              )}>{v.status}</span>
+                            <div>
+                              <p className="font-semibold text-slate-900 text-sm">{v.plateNumber}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                <span className="inline-block mr-2">{v.type}</span>
+                                <span className="inline-block mr-2">核载{v.capacity}人</span>
+                                <span className="inline-block">{v.brand}</span>
+                              </p>
                             </div>
+                            <span className="text-brand-600 text-xs font-medium flex items-center gap-0.5">
+                              <Plus size={12} /> 添加
+                            </span>
                           </div>
                         ))
                       ) : (
-                        <div className="p-4 text-center text-slate-400 text-sm">暂无符合条件的车辆</div>
+                        <p className="p-3 text-center text-xs text-slate-400">无匹配车辆</p>
                       )}
                     </div>
-                  </>
-                )}
+                  );
+                })()}
+                <p className="text-xs text-slate-400">点击检索结果即可添加为分配车辆，再维护对应司机；重新检索不影响已添加的车辆。</p>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">分配司机</label>
-                <select
-                  value={formData.driverId || ''}
-                  onChange={(e) => setFormData({ ...formData, driverId: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
-                >
-                  <option value="">暂不分配</option>
-                  {drivers.filter(d => d.status === '可调配' || d.id === modalData?.driverId).map(d => (
-                    <option key={d.id} value={d.id}>{d.name} - {d.phone}</option>
-                  ))}
-                </select>
-              </div>
+
+              {/* 已分配车辆行：只读车辆卡片 + 司机选择 + 删除 */}
+              {(formData.assignments || []).map((assignment: any, index: number) => {
+                // 本任务其他行已占用的司机（下拉中排除，避免重复分配）
+                const usedDriverIds: string[] = (formData.assignments || [])
+                  .map((a: any, i: number) => (i !== index ? a.driverId : null))
+                  .filter(Boolean);
+                const vehicle = vehicles.find(v => v.id === assignment.vehicleId);
+                return (
+                  <div key={index} className="border border-brand-200 rounded-xl p-3 bg-brand-50/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-600">车辆 {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            assignments: (formData.assignments || []).filter((_: any, i: number) => i !== index)
+                          })
+                        }
+                        className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1"
+                      >
+                        <X size={14} /> 删除
+                      </button>
+                    </div>
+                    {/* 已选车辆卡片（只读） */}
+                    {vehicle && (
+                      <div className="border-2 border-brand-300 bg-brand-50 rounded-xl p-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">已选择</span>
+                            <p className="font-bold text-slate-900 text-base mt-1">{vehicle.plateNumber}</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              <span className="inline-block mr-2">{vehicle.type}</span>
+                              <span className="inline-block mr-2">核载{vehicle.capacity}人</span>
+                              <span className="inline-block">{vehicle.brand}</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* 司机选择 */}
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">分配司机 <span className="text-red-500">*</span></label>
+                      <select
+                        value={assignment.driverId || ''}
+                        onChange={(e) => {
+                          const newAssignments = [...(formData.assignments || [])];
+                          newAssignments[index] = { ...newAssignments[index], driverId: e.target.value };
+                          setFormData({ ...formData, assignments: newAssignments });
+                        }}
+                        className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white"
+                      >
+                        <option value="">请选择司机</option>
+                        {drivers.filter(d =>
+                          (d.status === '可调配' || d.id === assignment.driverId) &&
+                          !usedDriverIds.includes(d.id)
+                        ).map(d => (
+                          <option key={d.id} value={d.id}>
+                            {d.name} - {d.phone} ({d.licenseType})
+                          </option>
+                        ))}
+                      </select>
+                      {!assignment.driverId && (
+                        <p className="text-xs text-red-500 mt-1">请为该车辆分配司机</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {(formData.assignments || []).length === 0 && (
+                <p className="text-center text-xs text-slate-400 py-4">点击上方检索结果添加车辆</p>
+              )}
+              <p className="text-xs text-slate-400">说明：可添加多辆车，每辆车需单独分配一名司机；同一任务内车辆、司机不可重复。创建时可暂不分配（不添加任何车辆）。</p>
             </div>
           </div>
 
@@ -2472,7 +2835,7 @@ function PCApp() {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'TASK_DETAIL'} onClose={handleClose} title="任务详情" size="xl">
+      <Modal isOpen={activeModal === 'TASK_DETAIL'} onClose={handleClose} title="任务详情" size="xl" helpData={taskHelpData['H.6.3']}>
         {modalData && (
           <div className="space-y-6">
             {/* 异常告警 */}
@@ -2640,52 +3003,58 @@ function PCApp() {
                 <h4 className="font-bold text-slate-700 text-sm">资源分配</h4>
               </div>
               <div className="p-5 space-y-4">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-2">分配车辆</p>
-                    {modalData.vehicleId ? (
-                      (() => {
-                        const v = vehicles.find(vv => vv.id === modalData.vehicleId);
-                        return v ? (
-                          <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-lg">
-                            <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center">
-                              <Car size={18} className="text-brand-600" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-semibold text-slate-900">{v.plateNumber}</p>
-                              <p className="text-xs text-slate-500">{v.brand} · {v.type} · {v.capacity}座</p>
-                            </div>
+                  {(() => {
+                    // 兼容多车辆分配与旧数据（仅 vehicleId/driverId）
+                    const list = (modalData.assignments && modalData.assignments.length > 0)
+                      ? modalData.assignments
+                      : (modalData.vehicleId ? [{ vehicleId: modalData.vehicleId, driverId: modalData.driverId }] : []);
+                    if (list.length === 0) {
+                      return <p className="text-slate-400 text-sm">未分配车辆与司机</p>;
+                    }
+                    return list.map((a: TaskAssignment, idx: number) => {
+                      const v = vehicles.find(vv => vv.id === a.vehicleId);
+                      const d = a.driverId ? drivers.find(dd => dd.id === a.driverId) : null;
+                      return (
+                        <div key={idx} className="space-y-2">
+                          {list.length > 1 && (
+                            <p className="text-xs font-semibold text-slate-500">车辆 {idx + 1}</p>
+                          )}
+                          <div>
+                            <p className="text-xs text-slate-500 mb-2">分配车辆</p>
+                            {v ? (
+                              <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-lg">
+                                <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center">
+                                  <Car size={18} className="text-brand-600" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-semibold text-slate-900">{v.plateNumber}</p>
+                                  <p className="text-xs text-slate-500">{v.brand} · {v.type} · {v.capacity}座</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-slate-400 text-sm">车辆信息不存在</p>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-slate-400 text-sm">车辆信息不存在</p>
-                        );
-                      })()
-                    ) : (
-                      <p className="text-slate-400 text-sm">未分配车辆</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-2">分配司机</p>
-                    {modalData.driverId ? (
-                      (() => {
-                        const d = drivers.find(dd => dd.id === modalData.driverId);
-                        return d ? (
-                          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                              <Users size={18} className="text-blue-600" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-semibold text-slate-900">{d.name}</p>
-                              <p className="text-xs text-slate-500">{d.phone} · {d.licenseType}</p>
-                            </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-2">分配司机</p>
+                            {d ? (
+                              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <Users size={18} className="text-blue-600" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-semibold text-slate-900">{d.name}</p>
+                                  <p className="text-xs text-slate-500">{d.phone} · {d.licenseType}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-slate-400 text-sm">未分配司机</p>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-slate-400 text-sm">司机信息不存在</p>
-                        );
-                      })()
-                    ) : (
-                      <p className="text-slate-400 text-sm">未分配司机</p>
-                    )}
-                  </div>
+                        </div>
+                      );
+                    });
+                  })()}
               </div>
             </div>
 
@@ -2716,15 +3085,20 @@ function PCApp() {
               <div className="bg-slate-50 p-4 rounded-xl">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <Map size={16} className="text-brand-600" />
+                    <MapIcon size={16} className="text-brand-600" />
                     任务轨迹
                   </h4>
-                  {modalData.status === '执行中' && (
-                    <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
-                      <Navigation size={12} />
-                      定位中
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {modalData.status === '已完成' && (
+                      <HelpIcon helpData={trackHelpData['H.9.2']} />
+                    )}
+                    {modalData.status === '执行中' && (
+                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
+                        <Navigation size={12} />
+                        定位中
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                   <div className="aspect-video bg-gradient-to-br from-brand-50 to-blue-50 flex items-center justify-center relative">
@@ -2777,7 +3151,7 @@ function PCApp() {
                     
                     {modalData.status === '已完成' && (
                       <div className="text-center text-slate-400">
-                        <Map size={32} className="mx-auto mb-2 opacity-50" />
+                        <MapIcon size={32} className="mx-auto mb-2 opacity-50" />
                         <p className="text-sm">任务已完成，轨迹已记录</p>
                       </div>
                     )}
@@ -2981,7 +3355,7 @@ function PCApp() {
         )}
       </Modal>
 
-      <Modal isOpen={activeModal === 'ASSIGN_RESOURCE'} onClose={handleClose} title="分配资源">
+      <Modal isOpen={activeModal === 'ASSIGN_RESOURCE'} onClose={handleClose} title="分配资源" helpData={taskHelpData['H.6.5']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">选择车辆</label>
@@ -3015,7 +3389,7 @@ function PCApp() {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'REASSIGN_TASK'} onClose={handleClose} title="改派任务">
+      <Modal isOpen={activeModal === 'REASSIGN_TASK'} onClose={handleClose} title="改派任务" helpData={taskHelpData['H.6.6']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">选择车辆</label>
@@ -3058,7 +3432,7 @@ function PCApp() {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'CANCEL_TASK'} onClose={handleClose} title="取消任务">
+      <Modal isOpen={activeModal === 'CANCEL_TASK'} onClose={handleClose} title="取消任务" helpData={taskHelpData['H.6.7']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="bg-red-50 p-4 rounded-xl border border-red-200">
             <div className="flex items-start gap-3">
@@ -3221,6 +3595,432 @@ function PCApp() {
         </form>
       </Modal>
 
+      {/* ================= 调度员：新增 / 编辑 弹窗 ================= */}
+      <Modal
+        isOpen={activeModal === 'NEW_DISPATCHER' || activeModal === 'EDIT_DISPATCHER'}
+        onClose={handleClose}
+        title={activeModal === 'NEW_DISPATCHER' ? '新增调度员' : '编辑调度员'}
+        size="lg"
+        helpData={dispatcherHelpData['H.10.2']}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                单位名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                defaultValue={activeModal === 'EDIT_DISPATCHER' ? modalData?.unitName : ''}
+                onChange={(e) => setFormData({ ...formData, unitName: e.target.value })}
+                required
+                placeholder="如：政府办、接待办"
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                调度员姓名 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                defaultValue={activeModal === 'EDIT_DISPATCHER' ? modalData?.name : ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                placeholder="请输入调度员姓名"
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                手机号 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                defaultValue={activeModal === 'EDIT_DISPATCHER' ? modalData?.phone : ''}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                required
+                maxLength={11}
+                placeholder="11 位手机号"
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                职务 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                defaultValue={activeModal === 'EDIT_DISPATCHER' ? modalData?.position : ''}
+                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                required
+                placeholder="如：现场调度员、调度科科长"
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                所属活动 <span className="text-red-500">*</span>
+              </label>
+              {activeModal === 'EDIT_DISPATCHER' ? (
+                <div className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
+                  {activities.find((a) => a.id === modalData?.activityId)?.name ?? '-'}
+                  <span className="ml-2 text-xs text-slate-400">（编辑时不可修改）</span>
+                </div>
+              ) : (
+                <select
+                  required
+                  value={formData.activityId as string | undefined ?? ''}
+                  onChange={(e) => setFormData({ ...formData, activityId: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+                >
+                  <option value="">请选择所属活动</option>
+                  {activities
+                    .filter((a) => a.period !== '结束期')
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}（{a.period}）
+                      </option>
+                    ))}
+                </select>
+              )}
+              {activeModal === 'NEW_DISPATCHER' &&
+                activities.filter((a) => a.period !== '结束期').length === 0 && (
+                  <p className="mt-2 text-sm text-amber-600">暂无可用的活动，请先创建活动</p>
+                )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">身份证号（选填）</label>
+              <input
+                type="text"
+                defaultValue={activeModal === 'EDIT_DISPATCHER' ? modalData?.idCardNumber : ''}
+                onChange={(e) => setFormData({ ...formData, idCardNumber: e.target.value })}
+                placeholder="18 位身份证号（可选）"
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {activeModal === 'EDIT_DISPATCHER' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">状态</label>
+              <select
+                defaultValue={modalData?.status ?? '可用'}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value as DispatcherStatus })
+                }
+                className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
+              >
+                <option value="可用">可用</option>
+                <option value="禁用">禁用</option>
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 py-3 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-all"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={18} />
+              保存
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ================= 调度员：删除 确认弹窗 ================= */}
+      <Modal isOpen={activeModal === 'DELETE_DISPATCHER'} onClose={handleClose} title="删除调度员" size="sm" helpData={dispatcherHelpData['H.10.4']}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="bg-red-50 p-4 rounded-xl border border-red-200">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="font-medium text-red-800">确定要删除此调度员吗？</p>
+                <p className="text-sm text-red-600 mt-1">姓名：{modalData?.name}（{modalData?.phone}），此操作无法撤销。</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 py-3 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-all"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all"
+            >
+              确认删除
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ================= 调度员：业务校验 提示弹窗（只读） ================= */}
+      <Modal
+        isOpen={activeModal === 'DISPATCHER_ALERT'}
+        onClose={handleClose}
+        title="操作无法继续"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="bg-red-50 p-4 rounded-xl border border-red-200">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={22} />
+              <p className="text-sm text-red-800 whitespace-pre-line leading-relaxed">
+                {modalData?.message ?? ''}
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-6 py-2.5 bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition-all"
+            >
+              知道了
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ================= 调度员：批量导入 弹窗 ================= */}
+      <Modal
+        isOpen={activeModal === 'IMPORT_DISPATCHERS'}
+        onClose={handleClose}
+        title="批量导入调度员"
+        size="xl"
+        helpData={dispatcherHelpData['H.10.3']}
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-500">
+              请先下载模板，按模板填写数据后上传。单次导入最多 500 条。
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                downloadTextAsFile('调度员导入模板.csv', buildDispatcherTemplateCSV())
+              }
+              className="text-brand-600 hover:text-brand-700 text-sm font-medium flex items-center gap-1"
+            >
+              <Download size={16} /> 下载模板
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">选择 CSV 文件</label>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-6 cursor-pointer transition-colors bg-slate-50 hover:bg-brand-50/40">
+              <UploadCloud size={32} className="text-slate-400 mb-2" />
+              <p className="text-sm text-slate-600">点击选择 CSV 文件（仅 .csv）</p>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  // H.10.3: 文件格式校验
+                  const fileName = file.name || '';
+                  const lowerName = fileName.toLowerCase();
+                  const isCsvByName = lowerName.endsWith('.csv');
+                  const isCsvByType = file.type === 'text/csv' || file.type === 'application/csv' || file.type === '';
+                  if (!isCsvByName && !isCsvByType) {
+                    alert('请上传正确格式的CSV文件');
+                    e.target.value = '';
+                    return;
+                  }
+                  try {
+                    const text = await file.text();
+                    const parsed = parseCSV(text, 500);
+                    setImportTruncated(parsed.truncated);
+                    const activityNameSet = new Set(
+                      (activities.map((a) => a.name) as string[]),
+                    );
+                    // 预览：先统一建一个可变数组类型
+                    type ImportRow = { data: Record<string, string>; ok: boolean; reason?: string };
+                    const preview: ImportRow[] = [];
+                    // 为了防批次内冲突，维护一个"按手机号聚合姓名"的小集合
+                    const batchByPhone = new Map();
+                    // 第一遍：每条校验，但不做批次内 姓名+手机+活动 重复
+                    for (const r of parsed.rows) {
+                      const unit = (r['单位名称'] || '').trim();
+                      const name = (r['调度员姓名'] || '').trim();
+                      const phone = (r['手机号'] || '').trim();
+                      const actName = (r['所属活动名称'] || '').trim();
+                      const position = (r['职务'] || '').trim();
+
+                      let ok = true;
+                      let reason: string | undefined;
+                      if (!unit || !name || !phone || !actName || !position) {
+                        ok = false;
+                        reason = '存在必填字段为空（单位/姓名/手机/活动/职务）';
+                      } else if (!isValidChineseMobile(phone)) {
+                        ok = false;
+                        reason = '手机号格式错误';
+                      } else if (!activityNameSet.has(actName)) {
+                        ok = false;
+                        reason = `活动名称"${actName}"不存在（结束期活动不在可选范围）`;
+                      } else {
+                        const dbCheck = validateDispatcherNamePhone(dispatchers, name, phone, undefined, 'batch');
+                        if (!dbCheck.ok) {
+                          ok = false;
+                          reason = dbCheck.message;
+                        } else {
+                          // 批次内同手机号姓名一致性
+                          const names = batchByPhone.get(phone) as Set<string> | undefined;
+                          if (!names) {
+                            const s = new Set();
+                            s.add(name);
+                            batchByPhone.set(phone, s);
+                          } else if (names.size > 0 && !names.has(name)) {
+                            ok = false;
+                            reason = '该手机号在导入文件内已被不同姓名使用，存在冲突';
+                          } else {
+                            names.add(name);
+                          }
+                        }
+                      }
+                      preview.push({ data: r, ok, reason });
+                    }
+                    // 第二遍：批次内 姓名+手机+活动 重复 标记
+                    const seenBatch = new Set();
+                    for (const item of preview) {
+                      if (!item.ok) continue;
+                      const key = `${item.data['调度员姓名']}|${item.data['手机号']}|${item.data['所属活动名称']}`;
+                      if (seenBatch.has(key)) {
+                        item.ok = false;
+                        item.reason = '重复';
+                      } else {
+                        seenBatch.add(key);
+                      }
+                    }
+                    setImportPreview(preview);
+                  } catch (err) {
+                    alert('读取文件失败，请检查文件格式后重试');
+                    setImportPreview([]);
+                    setImportTruncated(false);
+                  } finally {
+                    e.target.value = ''; // 允许再次选同一文件
+                  }
+                }}
+              />
+            </label>
+          </div>
+
+          {importPreview.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-600">
+                  成功{' '}
+                  <span className="font-semibold text-green-700">
+                    {importPreview.filter((r) => r.ok).length}
+                  </span>{' '}
+                  条，失败{' '}
+                  <span className="font-semibold text-red-700">
+                    {importPreview.filter((r) => !r.ok).length}
+                  </span>{' '}
+                  条
+                </span>
+                {importTruncated && (
+                  <span className="text-amber-600 text-xs">
+                    超过 500 行，仅预览前 500 行
+                  </span>
+                )}
+              </div>
+              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 sticky top-0">
+                    <tr>
+                      {DISPATCHER_IMPORT_HEADERS.map((h) => (
+                        <th
+                          key={h}
+                          className="px-3 py-2 text-left text-xs font-semibold text-slate-500 border-b border-slate-200"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500 border-b border-slate-200 w-40">
+                        校验结果
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importPreview.map((row, i) => (
+                      <tr key={i} className="border-b border-slate-100 last:border-b-0">
+                        {DISPATCHER_IMPORT_HEADERS.map((h) => (
+                          <td
+                            key={h}
+                            className="px-3 py-2 text-slate-700 align-top whitespace-nowrap max-w-[160px] truncate"
+                            title={row.data[h]}
+                          >
+                            {row.data[h] || '-'}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 align-top whitespace-nowrap">
+                          {row.ok ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              校验通过
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-block max-w-[240px] px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 align-top"
+                              title={row.reason}
+                            >
+                              {row.reason ?? '校验失败'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 py-3 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-all"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit as unknown as React.MouseEventHandler<HTMLButtonElement>}
+              disabled={importPreview.length === 0}
+              className={cn(
+                'flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2',
+                importPreview.length === 0
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-brand-600 text-white hover:bg-brand-700',
+              )}
+            >
+              <UploadCloud size={18} />
+              确认导入
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {activeModal === 'VEHICLE_DETAIL' && modalData && (
         <VehicleDetail 
           vehicle={modalData as Vehicle} 
@@ -3235,7 +4035,7 @@ function PCApp() {
         />
       )}
 
-      <Modal isOpen={activeModal === 'EDIT_SUPPLIER'} onClose={handleClose} title="编辑供应商" size="xl">
+      <Modal isOpen={activeModal === 'EDIT_SUPPLIER'} onClose={handleClose} title="编辑供应商" size="xl" helpData={supplierHelpData['H.2.2']}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -3382,9 +4182,9 @@ function PCApp() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-500 mb-1">合同文件</label>
               <div className="flex gap-2 flex-wrap">
-                {contractFiles.map((_, index) => (
+                {contractFiles.map((file, index) => (
                   <div
-                    key={index}
+                    key={file.id || index}
                     className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <FileText size={24} className="text-slate-400" />
@@ -3403,7 +4203,7 @@ function PCApp() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setContractFiles([...contractFiles, ''])}
+                  onClick={() => setContractFiles([...contractFiles, { id: `cf-${Date.now()}`, fileName: `合同文件${contractFiles.length + 1}.pdf`, filePath: '', fileSize: 0, uploadTime: new Date().toLocaleString(), fileType: 'pdf' }])}
                   className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
                 >
                   <Plus size={24} />
@@ -3414,9 +4214,9 @@ function PCApp() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-500 mb-1">资质文件</label>
               <div className="flex gap-2 flex-wrap">
-                {qualificationFiles.map((_, index) => (
+                {qualificationFiles.map((file, index) => (
                   <div
-                    key={index}
+                    key={file.id || index}
                     className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <FileText size={24} className="text-slate-400" />
@@ -3435,7 +4235,7 @@ function PCApp() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setQualificationFiles([...qualificationFiles, ''])}
+                  onClick={() => setQualificationFiles([...qualificationFiles, { id: `qf-${Date.now()}`, fileName: `资质文件${qualificationFiles.length + 1}.png`, filePath: '', fileSize: 0, uploadTime: new Date().toLocaleString(), fileType: 'png' }])}
                   className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
                 >
                   <Plus size={24} />
@@ -3446,9 +4246,9 @@ function PCApp() {
             <div>
               <label className="block text-sm font-medium text-slate-500 mb-1">其他文件</label>
               <div className="flex gap-2 flex-wrap">
-                {otherSupplierFiles.map((_, index) => (
+                {otherSupplierFiles.map((file, index) => (
                   <div
-                    key={index}
+                    key={file.id || index}
                     className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <FileText size={24} className="text-slate-400" />
@@ -3467,7 +4267,7 @@ function PCApp() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setOtherSupplierFiles([...otherSupplierFiles, ''])}
+                  onClick={() => setOtherSupplierFiles([...otherSupplierFiles, { id: `of-${Date.now()}`, fileName: `其他文件${otherSupplierFiles.length + 1}.pdf`, filePath: '', fileSize: 0, uploadTime: new Date().toLocaleString(), fileType: 'pdf' }])}
                   className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-colors"
                 >
                   <Plus size={24} />

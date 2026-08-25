@@ -20,9 +20,12 @@ import {
   X,
   Package,
   MapPin,
-  Check
+  Check,
+  UserCog,
+  Download,
+  UploadCloud
 } from 'lucide-react';
-import { cn, isTaskAbnormal, getTaskAbnormalRules, getAbnormalColor } from '../../lib/utils';
+import { cn, isTaskAbnormal, getTaskAbnormalRules, getAbnormalColor, buildDispatcherTemplateCSV, downloadTextAsFile, findUnfinishedTasksForDispatcher, formatUnfinishedTaskPrompt } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import ActivityDetail from './ActivityDetail';
 import { SuppliersView } from './SupplierDetail';
@@ -30,7 +33,9 @@ import VehicleDetail from './VehicleDetail';
 import DriverDetail from './DriverDetail';
 import AuditManagementView from './AuditManagementView';
 import TrackScreen from './TrackScreen';
-import type { Activity, Vehicle, Driver, Task } from '../../types';
+import type { Activity, Vehicle, Driver, Task, Dispatcher } from '../../types';
+import HelpIcon from '../../components/HelpIcon';
+import { activityHelpData, vehicleHelpData, driverHelpData, taskHelpData, dispatcherHelpData } from '../../constants/helpData';
 
 const PCLayout: React.FC<{
   activeTab: string;
@@ -59,6 +64,7 @@ const PCLayout: React.FC<{
       icon: LayoutDashboard,
       children: [
         { id: 'activities', label: '活动管理', icon: LayoutDashboard },
+        { id: 'dispatchers', label: '调度员管理', icon: UserCog },
         { id: 'tasks', label: '任务调度', icon: ClipboardList },
       ]
     },
@@ -205,6 +211,7 @@ const PCLayout: React.FC<{
           {activeTab === 'audit' && <AuditManagementView />}
           {activeTab === 'vehicles' && <VehiclesView />}
           {activeTab === 'drivers' && <DriversView />}
+          {activeTab === 'dispatchers' && <DispatchersView />}
           {activeTab === 'suppliers' && <SuppliersView />}
         </main>
       </div>
@@ -229,6 +236,7 @@ const ActivitiesView: React.FC<{
               <Filter size={16} />
               筛选
             </button>
+            <HelpIcon helpData={activityHelpData['H.1.1']} />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -372,7 +380,10 @@ const TasksView = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-900">任务调度</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-900">任务调度</h2>
+        <HelpIcon helpData={taskHelpData['H.6.1']} />
+      </div>
 
       <div className="flex gap-4 flex-wrap">
         <div className="w-64">
@@ -530,8 +541,12 @@ const TasksView = () => {
           <tbody className="divide-y divide-slate-100">
             {filteredTasks.length > 0 ? (
               filteredTasks.map(task => {
-                const vehicle = vehicles.find(v => v.id === task.vehicleId);
-                const driver = drivers.find(d => d.id === task.driverId);
+                // 兼容多车辆分配与旧数据
+                const assignmentList = (task.assignments && task.assignments.length > 0)
+                  ? task.assignments
+                  : (task.vehicleId ? [{ vehicleId: task.vehicleId, driverId: task.driverId }] : []);
+                const vehiclePlates = assignmentList.map(a => vehicles.find(v => v.id === a.vehicleId)?.plateNumber).filter(Boolean);
+                const driverNames = assignmentList.map(a => drivers.find(d => d.id === a.driverId)?.name).filter(Boolean);
                 const activity = activities.find(a => a.id === task.activityId);
                 const isAbnormal = isTaskAbnormal(task);
                 const abnormalRules = getTaskAbnormalRules(task);
@@ -591,8 +606,8 @@ const TasksView = () => {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-slate-700">{vehicle?.plateNumber || '未分配'}</div>
-                      <div className="text-xs text-slate-400">{driver?.name || '未分配'}</div>
+                      <div className="text-sm text-slate-700">{vehiclePlates.length > 0 ? vehiclePlates.join('、') : '未分配'}</div>
+                      <div className="text-xs text-slate-400">{driverNames.length > 0 ? driverNames.join('、') : '未分配'}</div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-slate-600">{task.fieldDispatcher || '未指定'}</span>
@@ -671,15 +686,18 @@ const TasksView = () => {
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-900">审核暂停申请</h3>
-              <button
-                onClick={() => {
-                  setShowSuspendAuditModal(false);
-                  setTaskToAudit(null);
-                }}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <HelpIcon helpData={taskHelpData['H.6.8']} />
+                <button
+                  onClick={() => {
+                    setShowSuspendAuditModal(false);
+                    setTaskToAudit(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
             
             <div className="space-y-4">
@@ -786,6 +804,7 @@ const VehiclesView = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">车辆管理</h2>
           <div className="flex items-center gap-2">
+            <HelpIcon helpData={vehicleHelpData['H.3.1']} />
             <button 
               onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_VEHICLE' } })}
               className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
@@ -1056,9 +1075,12 @@ const VehiclesView = () => {
           <div className="bg-white rounded-2xl w-[500px] max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <h3 className="text-lg font-bold text-slate-900">批量维护驻点场地</h3>
-              <button onClick={() => setShowBatchLocationModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <HelpIcon helpData={vehicleHelpData['H.3.5']} />
+                <button onClick={() => setShowBatchLocationModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
@@ -1171,6 +1193,7 @@ const DriversView = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">司机管理</h2>
           <div className="flex items-center gap-2">
+            <HelpIcon helpData={driverHelpData['H.4.1']} />
             <button 
               onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_DRIVER' } })}
               className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
@@ -1375,6 +1398,202 @@ const DriversView = () => {
         />
       )}
     </>
+  );
+};
+
+const DispatchersView = () => {
+  const { dispatchers, activities, tasks, dispatch } = useApp();
+  const [nameFilter, setNameFilter] = useState<string>('');
+  const [activityFilter, setActivityFilter] = useState<string>('');
+  const [unitFilter, setUnitFilter] = useState<string>('');
+
+  const filteredDispatchers: Dispatcher[] = dispatchers.filter((d) => {
+    if (nameFilter && !d.name.includes(nameFilter.trim())) return false;
+    if (activityFilter && d.activityId !== activityFilter) return false;
+    if (unitFilter && !d.unitName.includes(unitFilter.trim())) return false;
+    return true;
+  });
+
+  const getActivityName = (activityId: string) =>
+    activities.find((a) => a.id === activityId)?.name || '-';
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-900">调度员管理</h2>
+        <div className="flex items-center gap-2">
+          <HelpIcon helpData={dispatcherHelpData['H.10.1']} />
+          <button
+            onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'NEW_DISPATCHER' } })}
+            className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+          >
+            <Plus size={16} />
+            新增调度员
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'OPEN_MODAL', payload: { type: 'IMPORT_DISPATCHERS' } })}
+            className="text-slate-600 hover:text-slate-800 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium flex items-center gap-2"
+          >
+            <UploadCloud size={16} />
+            批量导入
+          </button>
+          <button
+            onClick={() =>
+              downloadTextAsFile('调度员导入模板.csv', buildDispatcherTemplateCSV())
+            }
+            className="text-slate-600 hover:text-slate-800 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium flex items-center gap-2"
+          >
+            <Download size={16} />
+            下载模板
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4">
+        <div className="w-48">
+          <label className="block text-sm font-medium text-slate-700 mb-1">调度员姓名</label>
+          <input
+            type="text"
+            value={nameFilter}
+            onChange={(e) => setNameFilter(e.target.value)}
+            className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+            placeholder="输入调度员姓名"
+          />
+        </div>
+        <div className="w-48">
+          <label className="block text-sm font-medium text-slate-700 mb-1">所属活动</label>
+          <select
+            value={activityFilter}
+            onChange={(e) => setActivityFilter(e.target.value)}
+            className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+          >
+            <option value="">全部活动</option>
+            {activities
+              .filter((a) => a.period !== '结束期')
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div className="w-48">
+          <label className="block text-sm font-medium text-slate-700 mb-1">单位名称</label>
+          <input
+            type="text"
+            value={unitFilter}
+            onChange={(e) => setUnitFilter(e.target.value)}
+            className="w-full p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+            placeholder="输入单位名称"
+          />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  单位名称
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  调度员
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  手机号
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  所属活动
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  状态
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  操作
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-200">
+              {filteredDispatchers.map((d) => (
+                <tr key={d.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{d.unitName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center text-brand-600 font-bold text-sm">
+                        {d.name.charAt(0)}
+                      </div>
+                      <div className="text-sm font-medium text-slate-900">{d.name}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{d.phone}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                    {getActivityName(d.activityId)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={cn(
+                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                        d.status === '可用'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-slate-200 text-slate-700',
+                      )}
+                    >
+                      {d.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() =>
+                          dispatch({ type: 'OPEN_MODAL', payload: { type: 'EDIT_DISPATCHER', data: d } })
+                        }
+                        className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        <Edit2 size={14} />
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => {
+                          // H.10.1: 点击删除按钮即校验未结束任务
+                          // 0 条 → 弹出删除确认框；>0 条 → 弹出提示框，不执行删除
+                          const unfinished = findUnfinishedTasksForDispatcher(
+                            tasks,
+                            activities,
+                            d.name,
+                            d.phone,
+                          );
+                          if (unfinished.length > 0) {
+                            dispatch({
+                              type: 'OPEN_MODAL',
+                              payload: {
+                                type: 'DISPATCHER_ALERT',
+                                data: { message: formatUnfinishedTaskPrompt(unfinished, '删除') },
+                              },
+                            });
+                          } else {
+                            dispatch({
+                              type: 'OPEN_MODAL',
+                              payload: { type: 'DELETE_DISPATCHER', data: d },
+                            });
+                          }
+                        }}
+                        className="text-slate-500 hover:text-red-600"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredDispatchers.length === 0 && (
+          <div className="px-6 py-12 text-center text-slate-500">暂无调度员数据</div>
+        )}
+      </div>
+    </div>
   );
 };
 

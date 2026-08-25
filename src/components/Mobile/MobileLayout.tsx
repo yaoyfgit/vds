@@ -19,6 +19,8 @@ import {
 import { cn, getTaskAbnormalRules, getAbnormalColor } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import DispatcherView from './DispatcherView';
+import HelpIcon from '../HelpIcon';
+import { driverMobileHelpData } from '../../constants/helpData';
 import type { Task } from '../../types';
 
 const MobileLayout: React.FC = () => {
@@ -33,12 +35,20 @@ const MobileLayout: React.FC = () => {
           <h1 className="text-xl font-bold text-white">
             {role === 'driver' ? '司机端' : '调度看板'}
           </h1>
-          <button 
-            onClick={() => setRole(r => r === 'driver' ? 'dispatcher' : 'driver')}
-            className="text-xs bg-white/20 px-3 py-1 rounded-full text-white font-medium hover:bg-white/30 transition-colors"
-          >
-            切换为{role === 'driver' ? '调度员' : '司机'}
-          </button>
+          <div className="flex items-center gap-2">
+            {role === 'driver' && (
+              <HelpIcon 
+                helpData={driverMobileHelpData['H.7.1']} 
+                className="p-1.5 hover:bg-white/20 rounded-full transition-colors text-white/90 hover:text-white"
+              />
+            )}
+            <button 
+              onClick={() => setRole(r => r === 'driver' ? 'dispatcher' : 'driver')}
+              className="text-xs bg-white/20 px-3 py-1 rounded-full text-white font-medium hover:bg-white/30 transition-colors"
+            >
+              切换为{role === 'driver' ? '调度员' : '司机'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -294,7 +304,10 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-lg font-bold text-slate-900">任务详情</h1>
-        <div className="w-8" />
+        <HelpIcon 
+          helpData={driverMobileHelpData['H.7.3']}
+          className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+        />
       </div>
 
       <div className="p-4 space-y-4">
@@ -1024,9 +1037,15 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
           <div className="bg-white rounded-t-3xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-slate-900">拒绝任务</h3>
-              <button onClick={() => setShowRejectModal(false)} className="text-slate-400 hover:text-slate-600">
-                <XCircle size={24} />
-              </button>
+              <div className="flex items-center gap-1">
+                <HelpIcon 
+                  helpData={driverMobileHelpData['H.7.4']}
+                  className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                />
+                <button onClick={() => setShowRejectModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <XCircle size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -1088,10 +1107,16 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
       {showPrivacyModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
                 <Bell size={32} className="text-blue-600" />
               </div>
+              <HelpIcon 
+                helpData={driverMobileHelpData['H.7.2']}
+                className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              />
+            </div>
+            <div className="text-center mb-6">
               <h3 className="text-lg font-bold text-slate-900 mb-2">服务告知书</h3>
               <p className="text-sm text-slate-600">请仔细阅读以下内容</p>
             </div>
@@ -1127,9 +1152,15 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
           <div className="bg-white rounded-t-3xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-slate-900">申请暂停任务</h3>
-              <button onClick={() => setShowSuspendModal(false)} className="text-slate-400 hover:text-slate-600">
-                <XCircle size={24} />
-              </button>
+              <div className="flex items-center gap-1">
+                <HelpIcon 
+                  helpData={driverMobileHelpData['H.7.5']}
+                  className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                />
+                <button onClick={() => setShowSuspendModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <XCircle size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -1203,9 +1234,15 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
           <div className="bg-white rounded-t-3xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-slate-900">故障上报</h3>
-              <button onClick={() => setShowFaultModal(false)} className="text-slate-400 hover:text-slate-600">
-                <XCircle size={24} />
-              </button>
+              <div className="flex items-center gap-1">
+                <HelpIcon 
+                  helpData={driverMobileHelpData['H.7.6']}
+                  className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                />
+                <button onClick={() => setShowFaultModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <XCircle size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">

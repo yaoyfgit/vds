@@ -8,6 +8,8 @@ import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import VehicleDetail from './VehicleDetail';
 import DriverDetail from './DriverDetail';
+import HelpIcon from '../HelpIcon';
+import { auditHelpData } from '../../constants/helpData';
 import type { Vehicle, Driver } from '../../types';
 
 const AuditManagementView = () => {
@@ -152,7 +154,8 @@ const AuditManagementView = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">资源审核管理</h2>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <HelpIcon helpData={auditHelpData['H.5.1']} />
             <div className="flex bg-slate-100 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab('pending')}
@@ -502,6 +505,7 @@ const AuditManagementView = () => {
         <VehicleDetail
           vehicle={selectedVehicle}
           onClose={() => setSelectedVehicle(null)}
+          helpData={auditHelpData['H.5.2']}
         />
       )}
 
@@ -509,6 +513,7 @@ const AuditManagementView = () => {
         <DriverDetail
           driver={selectedDriver}
           onClose={() => setSelectedDriver(null)}
+          helpData={auditHelpData['H.5.2']}
         />
       )}
 

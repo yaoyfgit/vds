@@ -15,13 +15,16 @@ import {
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import type { Driver } from '../../types';
+import HelpIcon from '../../components/HelpIcon';
+import { driverHelpData, HelpData } from '../../constants/helpData';
 
 interface DriverDetailProps {
   driver: Driver;
   onClose: () => void;
+  helpData?: HelpData;
 }
 
-const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
+const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose, helpData }) => {
   const { activities, drivers, vehicles, dispatch } = useApp();
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditAction, setAuditAction] = useState<'approve' | 'reject'>('approve');
@@ -83,6 +86,7 @@ const DriverDetail: React.FC<DriverDetailProps> = ({ driver, onClose }) => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <HelpIcon helpData={helpData || driverHelpData['H.4.2']} />
               {currentDriver.auditStatus === '待审核' && (
                 <button
                   onClick={() => setShowAuditModal(true)}

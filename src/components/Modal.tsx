@@ -1,6 +1,8 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import HelpIcon from './HelpIcon';
+import { HelpData } from '../constants/helpData';
 
 interface ModalProps {
   isOpen: boolean;
@@ -8,9 +10,10 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  helpData?: HelpData;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'lg' }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'lg', helpData }) => {
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -28,12 +31,15 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
       )}>
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <h3 className="text-xl font-bold text-slate-900">{title}</h3>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {helpData && <HelpIcon helpData={helpData} />}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
         <div className="p-6 overflow-y-auto flex-1">
           {children}
