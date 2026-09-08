@@ -849,10 +849,14 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
       name: '',
       type: '接送机',
       date: new Date().toISOString().split('T')[0],
+      endDate: new Date().toISOString().split('T')[0],
       startTime: '09:00',
       endTime: '10:00',
       from: '',
+      fromTime: '',
       to: '',
+      toTime: '',
+      waypoints: [] as { name: string; order: number; time?: string }[],
       passenger: '',
       passengerPhone: '',
       passengerCount: '',
@@ -902,6 +906,8 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
 
       const assignments = rawAssignments.map(a => ({ vehicleId: a.vehicleId, driverId: a.driverId }));
       const allAssigned = assignments.length > 0 && assignments.every(a => a.vehicleId && a.driverId);
+      // 过滤掉名称为空的途经点
+      const waypoints = (formData.waypoints || []).filter(w => w.name.trim());
       const newTask: Task = {
         id: Math.random().toString(36).substr(2, 9),
         activityId: selectedActivity,
@@ -911,7 +917,10 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
         startTime: formData.startTime,
         endTime: formData.endTime,
         from: formData.from,
+        fromTime: formData.fromTime || undefined,
         to: formData.to,
+        toTime: formData.toTime || undefined,
+        waypoints: waypoints.length ? waypoints : undefined,
         passenger: formData.passenger,
         passengerPhone: formData.passengerPhone,
         passengerCount: formData.passengerCount ? parseInt(formData.passengerCount) : undefined,
@@ -979,7 +988,20 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">任务日期</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">乘车人数</label>
+                <input
+                  type="number"
+                  value={formData.passengerCount}
+                  onChange={(e) => setFormData({...formData, passengerCount: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
+                  placeholder="如 3"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">开始日期 *</label>
                 <input
                   type="date"
                   value={formData.date}
@@ -987,11 +1009,8 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                   className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">开始时间</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">开始时间 *</label>
                 <input
                   type="time"
                   value={formData.startTime}
@@ -999,8 +1018,20 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                   className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">结束时间</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">结束日期 *</label>
+                <input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">结束时间 *</label>
                 <input
                   type="time"
                   value={formData.endTime}
@@ -1011,25 +1042,115 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">出发地 *</label>
-              <input
-                type="text"
-                value={formData.from}
-                onChange={(e) => setFormData({...formData, from: e.target.value})}
-                className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
-                placeholder="请输入出发地"
+              <label className="block text-sm font-medium text-slate-700 mb-2">任务描述</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                rows={2}
+                className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none resize-none"
+                placeholder="特殊要求、注意事项等"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">目的地 *</label>
-              <input
-                type="text"
-                value={formData.to}
-                onChange={(e) => setFormData({...formData, to: e.target.value})}
-                className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
-                placeholder="请输入目的地"
-              />
+            {/* 行程安排：出发地(含预计时间) → 途经点(含预计时间) → 目的地(含预计时间) */}
+            <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-3">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                <MapPin size={16} className="text-brand-600" /> 行程安排
+              </div>
+
+              {/* 出发地 */}
+              <div>
+                <label className="block text-xs text-green-600 font-medium mb-1">出发地 *</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.from}
+                    onChange={(e) => setFormData({...formData, from: e.target.value})}
+                    className="flex-1 p-2.5 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                    placeholder="出发地点"
+                  />
+                  <input
+                    type="time"
+                    value={formData.fromTime}
+                    onChange={(e) => setFormData({...formData, fromTime: e.target.value})}
+                    className="w-28 p-2.5 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                    title="出发预计时间"
+                  />
+                </div>
+              </div>
+
+              {/* 途经点 */}
+              {(formData.waypoints || []).map((waypoint, index) => (
+                <div key={index} className="pl-3 border-l-2 border-dashed border-slate-200 ml-2">
+                  <label className="block text-xs text-blue-600 font-medium mb-1">途经点 {index + 1}</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={waypoint.name}
+                      onChange={(e) => {
+                        const newWaypoints = [...(formData.waypoints || [])];
+                        newWaypoints[index] = { ...newWaypoints[index], name: e.target.value };
+                        setFormData({ ...formData, waypoints: newWaypoints });
+                      }}
+                      className="flex-1 p-2.5 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                      placeholder="途经点名称"
+                    />
+                    <input
+                      type="time"
+                      value={waypoint.time || ''}
+                      onChange={(e) => {
+                        const newWaypoints = [...(formData.waypoints || [])];
+                        newWaypoints[index] = { ...newWaypoints[index], time: e.target.value };
+                        setFormData({ ...formData, waypoints: newWaypoints });
+                      }}
+                      className="w-28 p-2.5 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                      title="途经点预计时间"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newWaypoints = (formData.waypoints || []).filter((_, i) => i !== index);
+                        setFormData({ ...formData, waypoints: newWaypoints });
+                      }}
+                      className="p-1.5 text-red-500 hover:text-red-700 flex-shrink-0"
+                    >
+                      <XCircle size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const newWaypoints = [...(formData.waypoints || []), { name: '', order: (formData.waypoints?.length || 0) + 1, time: '' }];
+                  setFormData({ ...formData, waypoints: newWaypoints });
+                }}
+                className="text-brand-600 hover:text-brand-700 text-xs font-medium flex items-center gap-1 ml-2"
+              >
+                <Plus size={12} /> 添加途经点
+              </button>
+
+              {/* 目的地 */}
+              <div>
+                <label className="block text-xs text-red-600 font-medium mb-1">目的地 *</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.to}
+                    onChange={(e) => setFormData({...formData, to: e.target.value})}
+                    className="flex-1 p-2.5 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                    placeholder="目的地点"
+                  />
+                  <input
+                    type="time"
+                    value={formData.toTime}
+                    onChange={(e) => setFormData({...formData, toTime: e.target.value})}
+                    className="w-28 p-2.5 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 focus:outline-none"
+                    title="到达预计时间"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1044,13 +1165,13 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ activeTab: externalTab 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">人数</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">联系电话</label>
                 <input
-                  type="number"
-                  value={formData.passengerCount}
-                  onChange={(e) => setFormData({...formData, passengerCount: e.target.value})}
+                  type="tel"
+                  value={formData.passengerPhone}
+                  onChange={(e) => setFormData({...formData, passengerPhone: e.target.value})}
                   className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-brand-500 focus:outline-none"
-                  placeholder="请输入人数"
+                  placeholder="请输入联系电话"
                 />
               </div>
             </div>
