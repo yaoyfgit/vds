@@ -26,6 +26,7 @@ import {
   XCircle,
   Download,
   UploadCloud,
+  Wand2,
 } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
 import PCLayout from './components/PC/PCLayout';
@@ -34,6 +35,7 @@ import Modal from './components/Modal';
 import HelpIcon from './components/HelpIcon';
 import VehicleDetail from './components/PC/VehicleDetail';
 import DriverDetail from './components/PC/DriverDetail';
+import MapLocationPicker, { MapLocationValue } from './components/PC/MapLocationPicker';
 import {
   generateId,
   cn,
@@ -49,6 +51,7 @@ import {
 } from './lib/utils';
 import type { Task, TaskAssignment, Vehicle, Driver, Activity, Supplier, ActivityStatus, ActivityPeriod, ResourceStatus, TaskStatus, AuditStatus, SupplierStatus, SupplierAttachment, Dispatcher, DispatcherStatus } from './types';
 import { systemAccounts } from './data/mockData';
+import { parseTaskText } from './lib/taskTextParser';
 import { activityHelpData, supplierHelpData, vehicleHelpData, driverHelpData, taskHelpData, trackHelpData, dispatcherHelpData } from './constants/helpData';
 
 // Main App Component
@@ -90,6 +93,14 @@ function PCApp() {
   const { tasks, vehicles, drivers, activities, suppliers, dispatchers, activeModal, modalData, currentUser, dispatch } = useApp();
 
   const [formData, setFormData] = useState<any>({});
+  // 新建任务-需求文本识别：粘贴内容、已识别字段、表单回填序号（触发字段重挂载以更新 defaultValue）
+  const [taskPasteText, setTaskPasteText] = useState('');
+  const [taskPasteRecognized, setTaskPasteRecognized] = useState<string[]>([]);
+  const [taskFillSeq, setTaskFillSeq] = useState(0);
+  // 新建/编辑任务-出发地/目的地地图选点弹窗：'from' | 'to' | null
+  const [taskLocationPicker, setTaskLocationPicker] = useState<'from' | 'to' | null>(null);
+  // 选点弹窗内的临时草稿，点"确定"才回填表单，避免拖动标记时误提交
+  const [taskLocationDraft, setTaskLocationDraft] = useState<MapLocationValue | null>(null);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
   const [vehicleAvailableRanges, setVehicleAvailableRanges] = useState<{from: string, to: string}[]>([]);
@@ -105,7 +116,7 @@ function PCApp() {
   const [cancelReason, setCancelReason] = useState('');
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
-  const [pcActiveTab, setPcActiveTab] = useState<string>('activities');
+  const [pcActiveTab, setPcActiveTab] = useState<string>('home');
   const [contractFiles, setContractFiles] = useState<SupplierAttachment[]>([]);
   const [qualificationFiles, setQualificationFiles] = useState<SupplierAttachment[]>([]);
   const [otherSupplierFiles, setOtherSupplierFiles] = useState<SupplierAttachment[]>([]);
@@ -186,6 +197,64 @@ function PCApp() {
       });
     }
   }, [activeModal, modalData]);
+
+  // 打开新建任务弹窗时重置需求文本识别状态
+  React.useEffect(() => {
+    if (activeModal === 'NEW_TASK') {
+      setTaskPasteText('');
+      setTaskPasteRecognized([]);
+    }
+  }, [activeModal]);
+
+  // 识别粘贴的用车需求文本并回填表单
+  const handleTaskPasteParse = () => {
+    const parsed = parseTaskText(taskPasteText);
+    if (parsed.recognized.length === 0) {
+      alert('未能识别出有效信息，请检查文本内容（需包含出发地/目的地、时间或乘车人等）');
+      return;
+    }
+    const { recognized, ...fields } = parsed;
+    // 文本识别只带出地点名称、没有坐标，清掉可能残留的旧坐标，避免坐标与名称不符
+    setFormData((f: any) => ({
+      ...f,
+      ...fields,
+      ...(fields.from !== undefined ? { fromLatitude: undefined, fromLongitude: undefined } : {}),
+      ...(fields.to !== undefined ? { toLatitude: undefined, toLongitude: undefined } : {}),
+    }));
+    setTaskFillSeq(s => s + 1);
+    setTaskPasteRecognized(recognized);
+  };
+
+  // 打开出发地/目的地选点弹窗，先把已有坐标载入草稿
+  const openTaskLocationPicker = (prefix: 'from' | 'to') => {
+    const src = activeModal === 'EDIT_TASK' ? modalData : formData;
+    if (src?.[`${prefix}Latitude`] !== undefined && src?.[`${prefix}Longitude`] !== undefined) {
+      setTaskLocationDraft({
+        location: src[`${prefix}`] || '',
+        latitude: src[`${prefix}Latitude`],
+        longitude: src[`${prefix}Longitude`],
+      });
+    } else {
+      setTaskLocationDraft(null);
+    }
+    setTaskLocationPicker(prefix);
+  };
+
+  // 草稿回填到出发地/目的地（名称 + 经纬度）
+  const confirmTaskLocationPick = () => {
+    if (!taskLocationDraft || !taskLocationPicker) {
+      alert('请先在地图上选择地点');
+      return;
+    }
+    const prefix = taskLocationPicker;
+    setFormData((f: any) => ({
+      ...f,
+      [`${prefix}`]: taskLocationDraft.location,
+      [`${prefix}Latitude`]: taskLocationDraft.latitude,
+      [`${prefix}Longitude`]: taskLocationDraft.longitude,
+    }));
+    setTaskLocationPicker(null);
+  };
 
   const handleClose = () => {
     dispatch({ type: 'CLOSE_MODAL' });
@@ -547,8 +616,12 @@ function PCApp() {
         endTime: formData.endTime,
         from: formData.from,
         fromTime: formData.startTime,
+        fromLatitude: formData.fromLatitude,
+        fromLongitude: formData.fromLongitude,
         to: formData.to,
         toTime: formData.endTime,
+        toLatitude: formData.toLatitude,
+        toLongitude: formData.toLongitude,
         waypoints: formData.waypoints?.filter((w: { name: string }) => w.name.trim()) || undefined,
         passenger: formData.passenger,
         passengerPhone: formData.passengerPhone,
@@ -577,6 +650,12 @@ function PCApp() {
           id: modalData.id,
           data: {
             ...formData,
+            from: formData.from ?? modalData.from,
+            to: formData.to ?? modalData.to,
+            fromLatitude: formData.fromLatitude ?? modalData.fromLatitude,
+            fromLongitude: formData.fromLongitude ?? modalData.fromLongitude,
+            toLatitude: formData.toLatitude ?? modalData.toLatitude,
+            toLongitude: formData.toLongitude ?? modalData.toLongitude,
             vehicleId: built.vehicleId,
             driverId: built.driverId,
             assignments: built.assignments.length ? built.assignments : undefined
@@ -919,17 +998,17 @@ function PCApp() {
 
   return (
     <>
-      <PCLayout 
-        activeTab={pcActiveTab}
-        onTabChange={setPcActiveTab}
-        onNavigateToAudit={() => setPcActiveTab('audit')}
-        onNavigateToTasks={(filterStatus) => {
-          setPcActiveTab('tasks');
-          if (filterStatus) {
-            (window as any).__taskFilterStatus = filterStatus;
-          }
-        }}
-      />
+        <PCLayout 
+          activeTab={pcActiveTab}
+          onTabChange={setPcActiveTab}
+          onNavigateToAudit={() => setPcActiveTab('audit')}
+          onNavigateToTasks={(filterStatus) => {
+            setPcActiveTab('tasks');
+            if (filterStatus) {
+              (window as any).__taskFilterStatus = filterStatus;
+            }
+          }}
+        />
       
       <Modal isOpen={activeModal === 'NEW_ACTIVITY' || activeModal === 'EDIT_ACTIVITY'} onClose={handleClose} title={activeModal === 'NEW_ACTIVITY' ? '新建活动' : '编辑活动'} helpData={activityHelpData['H.1.2']}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -2357,7 +2436,7 @@ function PCApp() {
       </Modal>
 
       <Modal isOpen={activeModal === 'NEW_TASK' || activeModal === 'EDIT_TASK'} onClose={handleClose} title={activeModal === 'NEW_TASK' ? '新建任务' : '编辑任务'} size="xl" helpData={taskHelpData['H.6.2']}>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form key={taskFillSeq} onSubmit={handleSubmit} className="space-y-5">
           {/* 活动选择 */}
           {activeModal === 'NEW_TASK' && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -2377,7 +2456,53 @@ function PCApp() {
               </select>
             </div>
           )}
-          
+
+          {/* 需求文本识别（仅新建任务） */}
+          {activeModal === 'NEW_TASK' && (
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-700">
+                  粘贴用车需求，自动填表
+                </label>
+                {taskPasteRecognized.length > 0 && (
+                  <span className="text-xs text-violet-600">
+                    已识别：{taskPasteRecognized.join('、')}
+                  </span>
+                )}
+              </div>
+              <textarea
+                value={taskPasteText}
+                onChange={(e) => setTaskPasteText(e.target.value)}
+                rows={3}
+                className="w-full p-3 rounded-xl border border-violet-200 focus:border-violet-500 outline-none resize-none bg-white text-sm"
+                placeholder={'粘贴用车需求文字（微信消息、通知邮件等均可），系统自动识别出发地、目的地、用车时间、乘车人和联系方式并填入下方表单。\n示例：6月12日下午2点半，张局长一行4人从吴圩机场到市政务中心，乘车人张局长，联系电话13812345678'}
+              />
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-slate-400">识别后可在下方表单中修改，请核对无误再保存</span>
+                <div className="flex gap-2">
+                  {taskPasteText && (
+                    <button
+                      type="button"
+                      onClick={() => { setTaskPasteText(''); setTaskPasteRecognized([]); }}
+                      className="px-3 py-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 text-sm"
+                    >
+                      清空
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleTaskPasteParse}
+                    disabled={!taskPasteText.trim()}
+                    className="px-3 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-1.5"
+                  >
+                    <Wand2 size={14} />
+                    识别填入
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 任务信息 */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
@@ -2393,7 +2518,7 @@ function PCApp() {
                 </label>
                 <input
                   type="text"
-                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.name : ''}
+                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.name : (formData.name ?? '')}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
                   placeholder="如：6月10日张局长接机"
@@ -2405,7 +2530,7 @@ function PCApp() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">任务类型</label>
                   <select
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.type : '接送机'}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.type : (formData.type || '接送机')}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                   >
@@ -2419,7 +2544,7 @@ function PCApp() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">现场调度员 <span className="text-red-500">*</span></label>
                   <select
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fieldDispatcher : '当前用户'}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fieldDispatcher : (formData.fieldDispatcher || '当前用户')}
                     onChange={(e) => setFormData({ ...formData, fieldDispatcher: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                     required
@@ -2434,7 +2559,7 @@ function PCApp() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">乘车人数</label>
                   <input
                     type="number"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerCount : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerCount : (formData.passengerCount ?? '')}
                     onChange={(e) => setFormData({ ...formData, passengerCount: parseInt(e.target.value) || 0 })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                     placeholder="乘车人数"
@@ -2449,7 +2574,7 @@ function PCApp() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">开始日期 <span className="text-red-500">*</span></label>
                   <input
                     type="date"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : (formData.date ?? '')}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                     required
@@ -2459,7 +2584,7 @@ function PCApp() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">开始时间 <span className="text-red-500">*</span></label>
                   <input
                     type="time"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.startTime : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.startTime : (formData.startTime ?? '')}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                     required
@@ -2469,7 +2594,7 @@ function PCApp() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">结束日期 <span className="text-red-500">*</span></label>
                   <input
                     type="date"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.date : (formData.endDate ?? formData.date ?? '')}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                     required
@@ -2479,7 +2604,7 @@ function PCApp() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">结束时间 <span className="text-red-500">*</span></label>
                   <input
                     type="time"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.endTime : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.endTime : (formData.endTime ?? '')}
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                     required
@@ -2492,7 +2617,7 @@ function PCApp() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">乘车人</label>
                   <input
                     type="text"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passenger : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passenger : (formData.passenger ?? '')}
                     onChange={(e) => setFormData({ ...formData, passenger: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                   />
@@ -2501,7 +2626,7 @@ function PCApp() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">联系电话</label>
                   <input
                     type="tel"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerPhone : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.passengerPhone : (formData.passengerPhone ?? '')}
                     onChange={(e) => setFormData({ ...formData, passengerPhone: e.target.value })}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none"
                   />
@@ -2511,7 +2636,7 @@ function PCApp() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">任务描述</label>
                 <textarea
-                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.description : ''}
+                  defaultValue={activeModal === 'EDIT_TASK' ? modalData?.description : (formData.description ?? '')}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                   className="w-full p-3 rounded-xl border border-slate-200 focus:border-brand-500 outline-none resize-none"
@@ -2535,22 +2660,38 @@ function PCApp() {
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <MapPin size={20} className="text-green-600" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs text-green-600 font-medium mb-1">出发地</label>
-                  <input
-                    type="text"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.from : ''}
-                    onChange={(e) => setFormData({ ...formData, from: e.target.value })}
-                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                    placeholder="出发地点"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.from ?? (activeModal === 'EDIT_TASK' ? modalData?.from : '') ?? ''}
+                      onChange={(e) => setFormData({ ...formData, from: e.target.value })}
+                      className="flex-1 min-w-0 p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                      placeholder="出发地点（可地图选点）"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openTaskLocationPicker('from')}
+                      className="shrink-0 px-3 rounded-lg border border-green-200 bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 flex items-center gap-1"
+                      title="在地图上选择出发地"
+                    >
+                      <MapPin size={13} />
+                      地图选点
+                    </button>
+                  </div>
+                  {(formData.fromLatitude ?? modalData?.fromLatitude) !== undefined && (
+                    <div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
+                      {(formData.fromLongitude ?? modalData?.fromLongitude)?.toFixed(6)}, {(formData.fromLatitude ?? modalData?.fromLatitude)?.toFixed(6)}
+                    </div>
+                  )}
                 </div>
                 <div className="w-32">
                   <label className="block text-xs text-slate-500 mb-1">出发时间</label>
                   <input
                     type="time"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fromTime : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.fromTime : (formData.fromTime ?? formData.startTime ?? '')}
                     onChange={(e) => setFormData({ ...formData, fromTime: e.target.value })}
                     className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
                   />
@@ -2625,22 +2766,38 @@ function PCApp() {
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <MapPin size={20} className="text-red-600" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs text-red-600 font-medium mb-1">目的地</label>
-                  <input
-                    type="text"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.to : ''}
-                    onChange={(e) => setFormData({ ...formData, to: e.target.value })}
-                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                    placeholder="目的地点"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.to ?? (activeModal === 'EDIT_TASK' ? modalData?.to : '') ?? ''}
+                      onChange={(e) => setFormData({ ...formData, to: e.target.value })}
+                      className="flex-1 min-w-0 p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
+                      placeholder="目的地点（可地图选点）"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openTaskLocationPicker('to')}
+                      className="shrink-0 px-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 flex items-center gap-1"
+                      title="在地图上选择目的地"
+                    >
+                      <MapPin size={13} />
+                      地图选点
+                    </button>
+                  </div>
+                  {(formData.toLatitude ?? modalData?.toLatitude) !== undefined && (
+                    <div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
+                      {(formData.toLongitude ?? modalData?.toLongitude)?.toFixed(6)}, {(formData.toLatitude ?? modalData?.toLatitude)?.toFixed(6)}
+                    </div>
+                  )}
                 </div>
                 <div className="w-32">
                   <label className="block text-xs text-slate-500 mb-1">到达时间</label>
                   <input
                     type="time"
-                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.toTime : ''}
+                    defaultValue={activeModal === 'EDIT_TASK' ? modalData?.toTime : (formData.toTime ?? formData.endTime ?? '')}
                     onChange={(e) => setFormData({ ...formData, toTime: e.target.value })}
                     className="w-full p-2.5 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
                   />
@@ -2833,6 +2990,41 @@ function PCApp() {
             {activeModal === 'NEW_TASK' ? '创建任务' : '保存修改'}
           </button>
         </form>
+      </Modal>
+
+      {/* 任务出发地/目的地地图选点弹窗 */}
+      <Modal
+        isOpen={taskLocationPicker !== null}
+        onClose={() => setTaskLocationPicker(null)}
+        title={taskLocationPicker === 'from' ? '选择出发地' : '选择目的地'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            搜索地址或在地图上点击选点，标记可拖动微调；选好后地点名称与经纬度会自动填入任务表单。
+          </p>
+          <MapLocationPicker
+            value={taskLocationDraft}
+            onChange={setTaskLocationDraft}
+            label={taskLocationPicker === 'from' ? '出发地（地图选点）' : '目的地（地图选点）'}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setTaskLocationPicker(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={confirmTaskLocationPick}
+              className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm hover:bg-brand-700"
+            >
+              确定
+            </button>
+          </div>
+        </div>
       </Modal>
 
       <Modal isOpen={activeModal === 'TASK_DETAIL'} onClose={handleClose} title="任务详情" size="xl" helpData={taskHelpData['H.6.3']}>

@@ -10,6 +10,17 @@ export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
+// ---------- 经纬度距离（Haversine，单位米）----------
+// 司机结束任务位置校验用；输入均为 WGS84 十进制度
+export function distanceInMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const rad = (d: number) => d * Math.PI / 180;
+  const dLat = rad(lat2 - lat1);
+  const dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 // ---------- 手机号格式校验 ----------
 // 中国大陆 11 位手机号（demo 级别正则，覆盖 13x/14x/15x/16x/17x/18x/19x）
 export function isValidChineseMobile(phone: string): boolean {

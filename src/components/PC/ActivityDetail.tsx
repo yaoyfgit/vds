@@ -29,6 +29,7 @@ import {
 import { cn, getTaskAbnormalRules } from '../../lib/utils';
 import { useApp, generateId } from '../../context/AppContext';
 import HelpIcon from '../../components/HelpIcon';
+import MapLocationPicker, { MapLocationValue } from './MapLocationPicker';
 import { activityHelpData } from '../../constants/helpData';
 import type { Activity, Vehicle, Driver, Task, ActivityPeriod, Supplier, WorkGroup } from '../../types';
 
@@ -533,12 +534,29 @@ const ActivityWorkGroupsTab: React.FC<{
   const [showModal, setShowModal] = useState(false);
   const [editingWorkGroup, setEditingWorkGroup] = useState<WorkGroup | null>(null);
   const [formData, setFormData] = useState({
+    name: '',
     location: '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
     fieldManager: '',
     fieldManagerPhone: '',
     fieldDispatcher: [] as string[],
     fieldDispatcherPhone: [] as string[]
   });
+
+  // 同一活动下已存在的地点名称（地图选点重名校验提示）
+  const existingLocationNames = workGroups
+    .filter(wg => !editingWorkGroup || wg.id !== editingWorkGroup.id)
+    .map(wg => wg.location);
+
+  const handleLocationChange = (value: MapLocationValue | null) => {
+    setFormData(prev => ({
+      ...prev,
+      location: value?.location || '',
+      latitude: value?.latitude,
+      longitude: value?.longitude
+    }));
+  };
 
   const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
   const [searchType, setSearchType] = useState<'manager' | 'dispatcher' | null>(null);
@@ -550,7 +568,10 @@ const ActivityWorkGroupsTab: React.FC<{
     if (workGroup) {
       setEditingWorkGroup(workGroup);
       setFormData({
+        name: workGroup.name || '',
         location: workGroup.location,
+        latitude: workGroup.latitude,
+        longitude: workGroup.longitude,
         fieldManager: workGroup.fieldManager || '',
         fieldManagerPhone: workGroup.fieldManagerPhone || '',
         fieldDispatcher: workGroup.fieldDispatcher || [],
@@ -559,7 +580,10 @@ const ActivityWorkGroupsTab: React.FC<{
     } else {
       setEditingWorkGroup(null);
       setFormData({
+        name: '',
         location: '',
+        latitude: undefined,
+        longitude: undefined,
         fieldManager: '',
         fieldManagerPhone: '',
         fieldDispatcher: [],
@@ -570,8 +594,26 @@ const ActivityWorkGroupsTab: React.FC<{
   };
 
   const handleSave = () => {
-    if (!formData.location || formData.fieldDispatcher.length === 0 || formData.fieldDispatcherPhone.length === 0) {
-      alert('请填写必填项（地点、现场调度员、调度员电话）');
+    const name = formData.name.trim();
+    if (!name) {
+      alert('请填写小组名称');
+      return;
+    }
+    const nameDuplicated = workGroups.some(
+      wg => wg.id !== editingWorkGroup?.id && (wg.name || '').trim() === name
+    );
+    if (nameDuplicated) {
+      alert('同一活动下已存在该小组名称');
+      return;
+    }
+    if (
+      !formData.location ||
+      formData.latitude === undefined ||
+      formData.longitude === undefined ||
+      formData.fieldDispatcher.length === 0 ||
+      formData.fieldDispatcherPhone.length === 0
+    ) {
+      alert('请完善必填项（小组名称、在地图上选择驻点场地、现场调度员、调度员电话）');
       return;
     }
 
@@ -581,7 +623,10 @@ const ActivityWorkGroupsTab: React.FC<{
         payload: {
           id: editingWorkGroup.id,
           data: {
+            name: formData.name.trim(),
             location: formData.location,
+            latitude: formData.latitude,
+            longitude: formData.longitude,
             fieldManager: formData.fieldManager || undefined,
             fieldManagerPhone: formData.fieldManagerPhone || undefined,
             fieldDispatcher: formData.fieldDispatcher,
@@ -595,7 +640,10 @@ const ActivityWorkGroupsTab: React.FC<{
         payload: {
           id: generateId(),
           activityId: activity.id,
+          name: formData.name.trim(),
           location: formData.location,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
           fieldManager: formData.fieldManager || undefined,
           fieldManagerPhone: formData.fieldManagerPhone || undefined,
           fieldDispatcher: formData.fieldDispatcher,
@@ -693,7 +741,8 @@ const ActivityWorkGroupsTab: React.FC<{
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
-              <th className="px-4 py-3">活动地点</th>
+              <th className="px-4 py-3">小组名称</th>
+              <th className="px-4 py-3">驻点场地</th>
               <th className="px-4 py-3">现场负责人</th>
               <th className="px-4 py-3">现场调度员</th>
               <th className="px-4 py-3">待完成任务数</th>
@@ -703,7 +752,15 @@ const ActivityWorkGroupsTab: React.FC<{
           <tbody className="divide-y divide-slate-100">
             {workGroups.length > 0 ? workGroups.map(wg => (
               <tr key={wg.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-4 py-3 font-semibold text-slate-900">{wg.location}</td>
+                <td className="px-4 py-3 font-semibold text-slate-900">{wg.name}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  <div>{wg.location}</div>
+                  {wg.latitude !== undefined && wg.longitude !== undefined && (
+                    <div className="text-xs text-slate-400 font-mono">
+                      {wg.longitude.toFixed(6)}, {wg.latitude.toFixed(6)}
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate-600">
                   <div>{wg.fieldManager || '-'}</div>
                   {wg.fieldManagerPhone && (
@@ -750,7 +807,7 @@ const ActivityWorkGroupsTab: React.FC<{
               </tr>
             )) : (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                   暂无工作小组
                 </td>
               </tr>
@@ -778,16 +835,28 @@ const ActivityWorkGroupsTab: React.FC<{
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  活动地点 <span className="text-red-500">*</span>
+                  小组名称 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
-                  placeholder="请输入活动地点"
+                  placeholder="如：政务中心小组"
                 />
+                <p className="mt-1 text-xs text-slate-400">同一活动下小组名称不可重复</p>
               </div>
+
+              <MapLocationPicker
+                value={
+                  formData.latitude !== undefined && formData.longitude !== undefined
+                    ? { location: formData.location, latitude: formData.latitude, longitude: formData.longitude }
+                    : null
+                }
+                onChange={handleLocationChange}
+                existingLocations={existingLocationNames}
+                label="驻点场地（地图选点）"
+              />
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">

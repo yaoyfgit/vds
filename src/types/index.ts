@@ -12,7 +12,14 @@ export type DispatcherStatus = '可用' | '禁用';
 export interface WorkGroup {
   id: string;
   activityId: string;
+  /** 小组名称（同一活动下不可重复） */
+  name: string;
+  /** 驻点场地名称（地图选点带出，可修改） */
   location: string;
+  /** 地图选点纬度（WGS84） */
+  latitude?: number;
+  /** 地图选点经度（WGS84） */
+  longitude?: number;
   fieldManager?: string;
   fieldManagerPhone?: string;
   fieldDispatcher: string[];
@@ -156,8 +163,14 @@ export interface Task {
   endTime: string;
   from: string;
   fromTime?: string;
+  /** 出发地地图选点坐标（WGS84） */
+  fromLatitude?: number;
+  fromLongitude?: number;
   to: string;
   toTime?: string;
+  /** 目的地地图选点坐标（WGS84） */
+  toLatitude?: number;
+  toLongitude?: number;
   waypoints?: { name: string; order: number; time?: string }[];
   passenger?: string;
   passengerPhone?: string;

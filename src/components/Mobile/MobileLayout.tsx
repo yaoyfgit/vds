@@ -16,7 +16,7 @@ import {
   Check,
   Flag
 } from 'lucide-react';
-import { cn, getTaskAbnormalRules, getAbnormalColor } from '../../lib/utils';
+import { cn, getTaskAbnormalRules, getAbnormalColor, distanceInMeters } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import DispatcherView from './DispatcherView';
 import HelpIcon from '../HelpIcon';
@@ -77,6 +77,25 @@ const MobileLayout: React.FC = () => {
   );
 };
 
+// 定位模拟场景（静态 demo 演示用，不改变真实产品逻辑）
+type LocationScenario = 'near' | 'far' | 'failed';
+type LocationCheckResult =
+  | { kind: 'pass'; distance: number }
+  | { kind: 'blocked'; distance: number }
+  | { kind: 'skipped' };
+
+// 以目的地坐标为基准，按纬度偏移生成模拟位置（纬度每 1 度约 111000 米）
+const SIMULATED_OFFSET_METERS: Record<Exclude<LocationScenario, 'failed'>, number> = {
+  near: 80,
+  far: 800,
+};
+function getSimulatedPosition(task: Task, scenario: Exclude<LocationScenario, 'failed'>) {
+  return {
+    latitude: (task.toLatitude ?? 0) + SIMULATED_OFFSET_METERS[scenario] / 111000,
+    longitude: task.toLongitude ?? 0,
+  };
+}
+
 const DriverView = ({ activeTab }: { activeTab: string }) => {
   const { tasks, dispatch, drivers } = useApp();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -96,6 +115,9 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
   const [agreedPrivacy, setAgreedPrivacy] = useState(false);
   const [showArrivalConfirmModal, setShowArrivalConfirmModal] = useState(false);
   const [arrivalLocation, setArrivalLocation] = useState<string | null>(null);
+  // 完成任务的定位模拟与校验结果（页面内提示，替代浏览器弹窗）
+  const [locationScenario, setLocationScenario] = useState<LocationScenario>('near');
+  const [locationCheck, setLocationCheck] = useState<LocationCheckResult | null>(null);
 
   useEffect(() => {
     const driver = drivers.find(d => d.status === '可调配');
@@ -157,11 +179,47 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
     setSelectedTask(null);
   };
 
-  const handleCompleteTask = () => {
+  // 司机结束任务：目的地 500m 定位校验
+  const doCompleteTask = () => {
     handleStatusChange(selectedTask!.id, '已完成', completeRemark || '任务完成', '司机');
     setCompleteRemark('');
+    setLocationCheck(null);
     setShowCompleteModal(false);
     setSelectedTask(null);
+  };
+
+  // 静态 demo 用定位场景模拟替代真实定位，距离仍由 Haversine 真实计算，便于现场演示超距拦截
+  const handleCompleteTask = () => {
+    const task = selectedTask!;
+    const hasCoord = task.toLatitude !== undefined && task.toLongitude !== undefined;
+    if (!hasCoord) {
+      // 目的地无坐标：数据缺失兜底，确认后直接完成
+      if (confirm('该任务目的地未设置地图坐标，无法进行位置校验。是否直接完成任务？')) {
+        doCompleteTask();
+      }
+      return;
+    }
+    if (locationScenario === 'failed') {
+      // 第一次点击提示已跳过校验，第二次点击才真正完成
+      if (locationCheck?.kind === 'skipped') {
+        doCompleteTask();
+      } else {
+        setLocationCheck({ kind: 'skipped' });
+      }
+      return;
+    }
+    const pos = getSimulatedPosition(task, locationScenario);
+    const dist = distanceInMeters(
+      pos.latitude, pos.longitude,
+      task.toLatitude!, task.toLongitude!
+    );
+    if (dist > 500) {
+      // 超出范围：拦截，页面内提示距离，弹窗保持打开供切换场景重试
+      setLocationCheck({ kind: 'blocked', distance: dist });
+      return;
+    }
+    setLocationCheck({ kind: 'pass', distance: dist });
+    doCompleteTask();
   };
 
   const handleAgreePrivacy = () => {
@@ -310,7 +368,7 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
         />
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 pb-24 space-y-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <div className="flex justify-between items-start mb-4">
             <div className="flex items-center gap-2">
@@ -486,29 +544,35 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
               </button>
             )}
             {selectedTask.status === '执行中' && (
-              <div className="grid grid-cols-3 gap-2 w-full">
-                <button 
-                  onClick={() => setShowSuspendModal(true)}
-                  className="bg-amber-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-amber-600 transition-all flex flex-col items-center justify-center gap-1"
-                >
-                  <Pause size={18} />
-                  暂停
-                </button>
-                <button 
-                  onClick={() => setShowFaultModal(true)}
-                  className="bg-red-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-red-600 transition-all flex flex-col items-center justify-center gap-1"
-                >
-                  <AlertTriangle size={18} />
-                  故障
-                </button>
-                <button 
-                  onClick={() => setShowCompleteModal(true)}
-                  className="bg-brand-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-brand-700 transition-all flex flex-col items-center justify-center gap-1"
-                >
-                  <CheckCircle2 size={18} />
-                  完成
-                </button>
-              </div>
+              <>
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  <button 
+                    onClick={() => setShowSuspendModal(true)}
+                    className="bg-amber-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-amber-600 transition-all flex flex-col items-center justify-center gap-1"
+                  >
+                    <Pause size={18} />
+                    暂停
+                  </button>
+                  <button 
+                    onClick={() => setShowFaultModal(true)}
+                    className="bg-red-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-red-600 transition-all flex flex-col items-center justify-center gap-1"
+                  >
+                    <AlertTriangle size={18} />
+                    故障
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setLocationScenario('near');
+                      setLocationCheck(null);
+                      setShowCompleteModal(true);
+                    }}
+                    className="bg-brand-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-brand-700 transition-all flex flex-col items-center justify-center gap-1"
+                  >
+                    <CheckCircle2 size={18} />
+                    完成
+                  </button>
+                </div>
+              </>
             )}
             {selectedTask.status === '已暂停' && (
               <div className="grid grid-cols-2 gap-3 w-full">
@@ -534,6 +598,12 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
               </div>
             )}
           </div>
+          {selectedTask.status === '执行中' && selectedTask.toLatitude !== undefined && selectedTask.toLongitude !== undefined && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 text-blue-700 px-3 py-2 text-xs leading-relaxed">
+              <MapPin size={14} className="shrink-0 mt-0.5" />
+              <span>结束任务需定位在目的地 500 米范围内，超出范围将无法完成</span>
+            </div>
+          )}
         </div>
 
         {selectedTask.history && selectedTask.history.length > 0 && (
@@ -1071,38 +1141,146 @@ const DriverView = ({ activeTab }: { activeTab: string }) => {
         </div>
       )}
 
-      {showCompleteModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
-          <div className="bg-white rounded-t-3xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-slate-900">完成任务</h3>
-              <button onClick={() => setShowCompleteModal(false)} className="text-slate-400 hover:text-slate-600">
-                <XCircle size={24} />
-              </button>
-            </div>
+      {showCompleteModal && (() => {
+        // 演示模式下实时显示模拟位置到目的地的距离
+        const simulatedDistance = (() => {
+          if (!selectedTask || selectedTask.toLatitude === undefined || selectedTask.toLongitude === undefined) return null;
+          if (locationScenario === 'failed') return null;
+          const pos = getSimulatedPosition(selectedTask, locationScenario as Exclude<LocationScenario, 'failed'>);
+          return distanceInMeters(pos.latitude, pos.longitude, selectedTask.toLatitude!, selectedTask.toLongitude!);
+        })();
+        const hasCoord = selectedTask?.toLatitude !== undefined && selectedTask?.toLongitude !== undefined;
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">完成备注</label>
-                <textarea
-                  value={completeRemark}
-                  onChange={(e) => setCompleteRemark(e.target.value)}
-                  placeholder="请填写完成备注（可选）"
-                  rows={4}
-                  className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 resize-none focus:border-brand-500 focus:outline-none"
-                />
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
+            <div className="bg-white rounded-t-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900">完成任务</h3>
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold tracking-wide">DEMO</span>
+                </div>
+                <button onClick={() => setShowCompleteModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <XCircle size={24} />
+                </button>
               </div>
 
-              <button
-                onClick={handleCompleteTask}
-                className="w-full bg-gradient-to-r from-brand-600 to-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:from-brand-700 hover:to-blue-700 transition-all shadow-md shadow-brand-200"
-              >
-                确认完成
-              </button>
+              <div className="space-y-4">
+                {hasCoord ? (
+                  <>
+                    <div className="flex items-start gap-2 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700 leading-relaxed">
+                      <MapPin size={14} className="shrink-0 mt-0.5" />
+                      结束任务需定位在目的地 500 米范围内。当前为演示模式，可切换定位场景查看校验效果。
+                    </div>
+
+                    {/* 定位场景模拟（静态 demo 用） */}
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-slate-800">定位场景模拟</span>
+                        <span className="text-[10px] text-slate-400">静态演示用</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([
+                          { key: 'near', label: '目的地附近', sub: '约 80 米', icon: MapPin },
+                          { key: 'far', label: '超出范围', sub: '约 800 米', icon: AlertTriangle },
+                          { key: 'failed', label: '定位失败', sub: '跳过校验', icon: XCircle },
+                        ] as const).map(({ key, label, sub, icon: Icon }) => (
+                          <button
+                            key={key}
+                            onClick={() => {
+                              setLocationScenario(key);
+                              setLocationCheck(null);
+                            }}
+                            className={cn(
+                              "flex flex-col items-center gap-1 rounded-xl border py-2.5 px-1 transition-all",
+                              locationScenario === key
+                                ? key === 'far'
+                                  ? "border-red-400 bg-red-50 text-red-700"
+                                  : key === 'failed'
+                                    ? "border-amber-400 bg-amber-50 text-amber-700"
+                                    : "border-brand-500 bg-brand-50 text-brand-700"
+                                : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                            )}
+                          >
+                            <Icon size={16} />
+                            <span className="text-xs font-bold">{label}</span>
+                            <span className="text-[10px] opacity-75">{sub}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {simulatedDistance !== null && (
+                        <div className={cn(
+                          "mt-3 rounded-lg px-3 py-2 text-xs flex items-center justify-between",
+                          simulatedDistance > 500 ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                        )}>
+                          <span>当前位置距目的地约 {Math.round(simulatedDistance)} 米</span>
+                          <span className="font-bold">{simulatedDistance > 500 ? '超出范围' : '范围内'}</span>
+                        </div>
+                      )}
+                      {locationScenario === 'failed' && (
+                        <div className="mt-3 rounded-lg px-3 py-2 text-xs bg-amber-50 text-amber-700">
+                          模拟定位失败或被拒绝，结束任务将跳过位置校验
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 校验结果：页面内提示，取代浏览器 alert/confirm */}
+                    {locationCheck?.kind === 'blocked' && (
+                      <div className="flex items-start gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-3 text-xs text-red-700">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">无法结束任务</p>
+                          <p className="mt-1 leading-relaxed">当前位置距目的地约 {Math.round(locationCheck.distance)} 米，需在 500 米内才能结束任务。可切换到「目的地附近」后重新校验。</p>
+                        </div>
+                      </div>
+                    )}
+                    {locationCheck?.kind === 'skipped' && (
+                      <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-3 text-xs text-amber-700">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">定位失败，已跳过位置校验</p>
+                          <p className="mt-1 leading-relaxed">再次点击下方按钮，确认直接完成任务。</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-700 leading-relaxed">
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    该任务目的地未设置地图坐标，结束任务将跳过位置校验。
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">完成备注</label>
+                  <textarea
+                    value={completeRemark}
+                    onChange={(e) => setCompleteRemark(e.target.value)}
+                    placeholder="请填写完成备注（可选）"
+                    rows={4}
+                    className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 resize-none focus:border-brand-500 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  onClick={handleCompleteTask}
+                  className={cn(
+                    "w-full text-white py-3 rounded-xl font-bold text-sm transition-all shadow-md",
+                    locationCheck?.kind === 'blocked'
+                      ? "bg-red-500 hover:bg-red-600 shadow-red-200"
+                      : "bg-gradient-to-r from-brand-600 to-blue-600 hover:from-brand-700 hover:to-blue-700 shadow-brand-200"
+                  )}
+                >
+                  {locationCheck?.kind === 'blocked'
+                    ? '重新校验位置'
+                    : locationCheck?.kind === 'skipped'
+                      ? '跳过校验并完成'
+                      : '确认完成'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {showPrivacyModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

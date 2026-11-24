@@ -23,11 +23,13 @@ import {
   Check,
   UserCog,
   Download,
-  UploadCloud
+  UploadCloud,
+  Home
 } from 'lucide-react';
 import { cn, isTaskAbnormal, getTaskAbnormalRules, getAbnormalColor, buildDispatcherTemplateCSV, downloadTextAsFile, findUnfinishedTasksForDispatcher, formatUnfinishedTaskPrompt } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 import ActivityDetail from './ActivityDetail';
+import HomeView from './HomeView';
 import { SuppliersView } from './SupplierDetail';
 import VehicleDetail from './VehicleDetail';
 import DriverDetail from './DriverDetail';
@@ -98,6 +100,19 @@ const PCLayout: React.FC<{
         </div>
 
         <nav className="flex-1 px-4 space-y-1">
+          {/* 首页入口 */}
+          <button
+            onClick={() => onTabChange('home')}
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium mb-2",
+              activeTab === 'home'
+                ? "bg-brand-100 text-brand-700"
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+            )}
+          >
+            <Home size={20} />
+            首页
+          </button>
           {navItems.map((item) => (
             <div key={item.id}>
               {/* 一级菜单 */}
@@ -175,7 +190,7 @@ const PCLayout: React.FC<{
               <Bell size={20} />
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">3</span>
             </button>
-            {activeTab !== 'audit' && activeTab !== 'vehicles' && activeTab !== 'drivers' && (
+            {activeTab !== 'audit' && activeTab !== 'vehicles' && activeTab !== 'drivers' && activeTab !== 'home' && (
               <button 
                 onClick={() => {
                   if (activeTab === 'activities') {
@@ -202,6 +217,7 @@ const PCLayout: React.FC<{
           "flex-1 overflow-hidden",
           activeTab === 'track' ? "p-0" : "p-8 overflow-y-auto"
         )}>
+          {activeTab === 'home' && <HomeView />}
           {activeTab === 'activities' && <ActivitiesView 
             onNavigateToAudit={onNavigateToAudit}
             onNavigateToTasks={onNavigateToTasks}
